@@ -1,0 +1,115 @@
+// Triage — shared work queue.
+//
+// Connection URLs live in prisma.config.ts (Prisma 7 moved them out of the
+// schema). Invariants that Prisma cannot express — the CHECK constraints tying
+// item status to its claim/resolve columns — are added by hand in the initial
+// migration and documented in docs/ARCHITECTURE.md.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  MEMBER
+  VIEWER
+}
+
+enum ItemStatus {
+  PENDING
+  CLAIMED
+  RESOLVED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  memberships  WorkspaceMembership[]
+  claimedItems Item[]                @relation("ItemClaimedBy")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  memberships WorkspaceMembership[]
+  items       Item[]
+}
+
+/// A user's role inside one workspace. This table is the authorization source
+/// of truth: every protected operation resolves the item's workspace first,
+/// then looks for a membership row here. No membership means no access.
+model WorkspaceMembership {
+  userId      String
+  workspaceId String
+  role        Role
+  createdAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, workspaceId])
+  @@index([userId])
+}
+
+/// A unit of work in the queue.
+///
+/// Lifecycle: PENDING -> CLAIMED -> RESOLVED, or CLAIMED -> PENDING on release.
+/// claimedById and claimedAt are set together and cleared together; the
+/// database enforces that with a CHECK constraint, so a half-written claim
+/// cannot be persisted even by a buggy query.
+model Item {
+  id          String     @id @default(cuid())
+  workspaceId String
+  title       String
+  status      ItemStatus @default(PENDING)
+  claimedById String?
+  claimedAt   DateTime?
+  resolvedAt  DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  claimedBy           User?                @relation("ItemClaimedBy", fields: [claimedById], references: [id], onDelete: Restrict)
+  notificationAttempt NotificationAttempt?
+
+  // Queue listing: always scoped to one workspace, usually filtered by status,
+  // ordered by recency.
+  @@index([workspaceId, status, createdAt])
+  // "What am I currently holding?"
+  @@index([claimedById])
+}
+
+/// Durable record of the notification triggered by resolving an item.
+///
+/// The row is written inside the same transaction as the resolve, so a resolve
+/// can never happen without a corresponding record. Delivery is attempted once
+/// after the response is sent; the outcome is written back here. A row left in
+/// PENDING means the attempt never finished, which is visible rather than lost.
+model NotificationAttempt {
+  id         String             @id @default(cuid())
+  itemId     String             @unique
+  status     NotificationStatus @default(PENDING)
+  error      String?
+  createdAt  DateTime           @default(now())
+  finishedAt DateTime?
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}

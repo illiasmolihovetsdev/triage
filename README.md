@@ -16,7 +16,8 @@ honest: it describes what actually runs today, not what is planned.
 | Requirement | State |
 | --- | --- |
 | Project scaffold | Done |
-| Database schema and seed | Not started |
+| Database schema and migration | Done |
+| Seed data | Not started |
 | Authentication (seeded users, signed cookie) | Not started |
 | R1 — exactly one winner per claim | Not started |
 | R2 — workspace isolation and roles | Not started |
@@ -55,6 +56,36 @@ The app serves on http://localhost:3000.
 pooled Supabase connection used at runtime; `DIRECT_URL` is the direct
 connection, needed separately because Prisma Migrate cannot run through a
 transaction pooler.
+
+## Database
+
+```bash
+npx prisma migrate deploy   # apply migrations
+npx prisma generate         # regenerate the client after a schema change
+npx prisma studio           # browse the data
+```
+
+The schema keeps its most important invariants in PostgreSQL rather than in
+application code, via `CHECK` constraints added by hand in
+`prisma/migrations/20260813170000_init/migration.sql`:
+
+- An item's `status` must agree with its claim columns. `PENDING` has no
+  claimant and no timestamps, `CLAIMED` has both a claimant and a claim time
+  and no resolution, `RESOLVED` has all three. A partially written claim cannot
+  be stored, whatever the calling code does.
+- A notification attempt that is `SENT` or `FAILED` must record `finishedAt`;
+  one still `PENDING` must not. A `FAILED` attempt must carry an error message
+  and a successful one must not.
+- `NotificationAttempt.itemId` is unique, so resolving an item cannot produce
+  two attempt records.
+
+Row level security is enabled on every table with no policies defined. Supabase
+publishes the `public` schema through its REST API, which would let anyone with
+the project's publishable key read and write items without passing through this
+application's authorization. With RLS on and no policies, that path is denied.
+The application is unaffected: it connects as the table-owning `postgres` role,
+which bypasses RLS. Authorization for the application lives in server-side code,
+not in database policies.
 
 ## Checks
 
