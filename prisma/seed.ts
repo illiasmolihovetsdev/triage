@@ -261,6 +261,28 @@ const createNotificationAttempts = async () => {
   `
 }
 
+/*
+ * Printed rather than documented in the README, so the list of sign-in accounts
+ * comes from the database that was actually seeded and cannot drift from it.
+ */
+const reportSeededAccounts = async () => {
+  const membershipList = await prisma.workspaceMembership.findMany({
+    select: {
+      role: true,
+      user: { select: { email: true } },
+      workspace: { select: { name: true } },
+    },
+    orderBy: [{ workspace: { name: 'asc' } }, { role: 'asc' }],
+  })
+
+  console.log('\nAccounts you can sign in as:')
+  membershipList.forEach((membership) => {
+    console.log(
+      `  ${membership.user.email.padEnd(20)} ${membership.workspace.name.padEnd(21)} ${membership.role.toLowerCase()}`
+    )
+  })
+}
+
 const reportSeededData = async () => {
   const statusCountList = await prisma.item.groupBy({
     by: ['workspaceId', 'status'],
@@ -289,6 +311,8 @@ const reportSeededData = async () => {
   })
 
   console.log(`\nTotal items: ${itemTotal}`)
+
+  await reportSeededAccounts()
 }
 
 const seed = async () => {

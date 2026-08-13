@@ -6,6 +6,11 @@ This document describes the current architectural direction of the Triage applic
 
 Some implementation decisions are intentionally left open until the relevant requirement is analyzed.
 
+It is a design document, so parts of it describe intent rather than code. For what
+is actually built and running — project structure, database invariants, row level
+security, authentication, and seed data — see `IMPLEMENTATION.md`. Where the two
+disagree, `IMPLEMENTATION.md` is the truthful one.
+
 Final architectural decisions should be reflected in `DECISIONS.md`.
 
 ## 1. System overview
@@ -96,6 +101,9 @@ The final model depends on the notification guarantee selected for the implement
 Do not introduce this model purely for abstraction. Introduce it only if required to provide the selected guarantee or prevent important state from being lost.
 
 ## 3. Authentication
+
+Implemented. See `IMPLEMENTATION.md` section 4 for the delivered mechanism and
+its security properties.
 
 Real OAuth is intentionally out of scope.
 
@@ -359,6 +367,10 @@ Record the selected guarantee in `DECISIONS.md`.
 
 ## 13. Database responsibilities
 
+Partly implemented. The schema, the `CHECK` constraints covering item state and
+notification records, and row level security are described in
+`IMPLEMENTATION.md` sections 2 and 3. Claim concurrency remains open until R1.
+
 PostgreSQL should enforce important invariants whenever practical.
 
 Consider:
@@ -544,15 +556,19 @@ Do not implement these prematurely.
 
 ## 21. Open decisions
 
-Finalize during implementation:
+Settled so far:
 
-- exact Prisma/database schema
-- item status representation
+- exact Prisma/database schema — see `IMPLEMENTATION.md` section 2
+- item status representation — `PENDING`, `CLAIMED`, `RESOLVED`, with the
+  status-to-columns agreement enforced by a `CHECK` constraint
+- mutations use Route Handlers; reads use Server Components
+
+Still open, to finalize during implementation:
+
 - claim concurrency strategy
 - authorization placement
 - notification delivery model
 - notification guarantee
-- Server Actions vs Route Handlers
 - pagination strategy if R4 is implemented
 - claim expiration strategy if R5 is implemented
 
