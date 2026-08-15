@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchSignOut } from '@/services/auth'
 import type { UseSignOutResult } from '@/components/CurrentUserBar/types'
@@ -15,7 +15,7 @@ export const useSignOut = (): UseSignOutResult => {
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const handleSignOut = useCallback(async () => {
+  const handleSignOut = async () => {
     setIsSigningOut(true)
     setErrorMessage(null)
 
@@ -28,7 +28,7 @@ export const useSignOut = (): UseSignOutResult => {
     }
 
     router.refresh()
-  }, [router])
+  }
 
   return { isSigningOut, errorMessage, handleSignOut }
 }

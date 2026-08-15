@@ -33,7 +33,7 @@ component ever imports another component's internals.
 The shape is the same at every level, so there is only one convention to learn:
 a component is a folder whose component file is `index.tsx`. A top-level folder
 is reserved for a component with more than one consumer; one that only ever
-renders inside a single parent nests inside it, as `UserPicker/UserRow/` does.
+renders inside a single parent nests inside it.
 The counterweight is that a single styled element used once is not a component
 at all — a folder per `<p>` produces a tree that is technically well-organized
 and practically unreadable.

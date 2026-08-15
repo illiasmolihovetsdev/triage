@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchSignIn } from '@/services/auth'
 import type { UseSignInResult } from '@/components/UserPicker/types'
@@ -22,28 +22,25 @@ export const useSignIn = (currentUserId: string | null): UseSignInResult => {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const handleSignIn = useCallback(
-    async (userId: string) => {
-      if (isAlreadySignedInAsRequestedUser(currentUserId, userId)) {
-        setErrorMessage(ALREADY_SIGNED_IN_MESSAGE)
-        return
-      }
+  const handleSignIn = async (userId: string) => {
+    if (isAlreadySignedInAsRequestedUser(currentUserId, userId)) {
+      setErrorMessage(ALREADY_SIGNED_IN_MESSAGE)
+      return
+    }
 
-      setPendingUserId(userId)
-      setErrorMessage(null)
+    setPendingUserId(userId)
+    setErrorMessage(null)
 
-      const signInResult = await fetchSignIn(userId)
+    const signInResult = await fetchSignIn(userId)
 
-      if (!signInResult.isSuccess) {
-        setErrorMessage(signInResult.errorMessage)
-        setPendingUserId(null)
-        return
-      }
+    if (!signInResult.isSuccess) {
+      setErrorMessage(signInResult.errorMessage)
+      setPendingUserId(null)
+      return
+    }
 
-      router.refresh()
-    },
-    [router, currentUserId]
-  )
+    router.refresh()
+  }
 
   return {
     pendingUserId,
