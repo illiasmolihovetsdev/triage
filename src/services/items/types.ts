@@ -52,3 +52,42 @@ export type FetchClaimItemResult =
       claimedBy: ClaimHolder | null
     }
   | { isSuccess: false; errorMessage: string }
+
+type ItemNotFoundResult = {
+  isSuccess: false
+  statusCode: 404
+  code: 'NOT_FOUND'
+  message: string
+}
+
+export type ResolveItemResult =
+  | { isSuccess: true; item: QueueItem }
+  | {
+      isSuccess: false
+      statusCode: 409
+      code: 'RESOLVE_CONFLICT'
+      message: string
+      item: QueueItem | null
+    }
+  | ItemNotFoundResult
+
+export type ReleaseItemResult =
+  | { isSuccess: true; item: QueueItem }
+  | {
+      isSuccess: false
+      statusCode: 409
+      code: 'RELEASE_CONFLICT'
+      message: string
+      item: QueueItem | null
+    }
+  | ItemNotFoundResult
+
+export type FetchItemActionResult =
+  | { isSuccess: true; item: QueueItem }
+  | {
+      isSuccess: false
+      code: 'RESOLVE_CONFLICT' | 'RELEASE_CONFLICT'
+      message: string
+      item: QueueItem | null
+    }
+  | { isSuccess: false; errorMessage: string }

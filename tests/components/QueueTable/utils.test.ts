@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   applyClaimConflict,
   canShowClaimButton,
+  canShowReleaseButton,
+  canShowResolveButton,
   getClaimButtonLabel,
+  getReleaseButtonLabel,
+  getResolveButtonLabel,
   getRowFeedbackMessage,
   replaceQueueItem,
 } from '@/components/QueueTable/utils'
@@ -71,7 +75,12 @@ describe('claim button visibility', () => {
 
   it('labels the button as claiming while the request is in flight', () => {
     expect(getClaimButtonLabel({ kind: 'idle' })).toBe('Claim')
-    expect(getClaimButtonLabel({ kind: 'loading' })).toBe('Claiming...')
+    expect(getClaimButtonLabel({ kind: 'loading', action: 'claim' })).toBe(
+      'Claiming...'
+    )
+    expect(getClaimButtonLabel({ kind: 'loading', action: 'resolve' })).toBe(
+      'Claim'
+    )
   })
 
   it('surfaces conflict and error text, and nothing when idle', () => {
@@ -88,5 +97,36 @@ describe('claim button visibility', () => {
       })
     ).toBe('Network error. Could not claim this item.')
     expect(getRowFeedbackMessage({ kind: 'idle' })).toBeNull()
+  })
+})
+
+describe('resolve and release button visibility', () => {
+  const claimedByBob: QueueItem = {
+    ...pendingItem,
+    status: 'claimed',
+    claimerId: 'user_bob',
+    claimerName: 'Bob Marsh',
+  }
+
+  it('shows resolve and release only to the claimer when the role allows it', () => {
+    expect(canShowResolveButton(true, claimedByBob, 'user_bob')).toBe(true)
+    expect(canShowReleaseButton(true, claimedByBob, 'user_bob')).toBe(true)
+    expect(canShowResolveButton(true, claimedByBob, 'user_carol')).toBe(false)
+    expect(canShowReleaseButton(true, claimedByBob, 'user_carol')).toBe(false)
+    expect(canShowResolveButton(false, claimedByBob, 'user_bob')).toBe(false)
+    expect(canShowReleaseButton(false, claimedByBob, 'user_bob')).toBe(false)
+    expect(canShowResolveButton(true, pendingItem, 'user_bob')).toBe(false)
+    expect(canShowReleaseButton(true, pendingItem, 'user_bob')).toBe(false)
+  })
+
+  it('labels resolve and release while the matching request is in flight', () => {
+    expect(getResolveButtonLabel({ kind: 'idle' })).toBe('Resolve')
+    expect(getResolveButtonLabel({ kind: 'loading', action: 'resolve' })).toBe(
+      'Resolving...'
+    )
+    expect(getReleaseButtonLabel({ kind: 'idle' })).toBe('Release')
+    expect(getReleaseButtonLabel({ kind: 'loading', action: 'release' })).toBe(
+      'Releasing...'
+    )
   })
 })

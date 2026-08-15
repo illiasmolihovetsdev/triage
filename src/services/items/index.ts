@@ -58,3 +58,5 @@ export const fetchQueuePage = async (
 }
 
 export { claimItem, claimItemWithClient } from '@/services/items/claim'
+export { resolveItem, resolveItemWithClient } from '@/services/items/resolve'
+export { releaseItem, releaseItemWithClient } from '@/services/items/release'

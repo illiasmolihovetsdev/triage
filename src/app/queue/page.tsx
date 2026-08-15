@@ -35,6 +35,8 @@ export default async function QueuePage() {
   const queuePageResult = await fetchQueuePage(membership.workspaceId)
   const membershipLabel = `${membership.workspaceName} · ${membership.role.toLowerCase()}`
   const canClaim = canRolePerformAction(membership.role, 'claim')
+  const canResolve = canRolePerformAction(membership.role, 'resolve')
+  const canRelease = canRolePerformAction(membership.role, 'release')
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -63,7 +65,10 @@ export default async function QueuePage() {
           itemList={queuePageResult.itemList}
           shownCount={queuePageResult.shownCount}
           totalCount={queuePageResult.totalCount}
+          currentUserId={user.id}
           canClaim={canClaim}
+          canResolve={canResolve}
+          canRelease={canRelease}
         />
       ) : (
         <p

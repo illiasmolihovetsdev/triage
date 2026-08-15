@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
+    include: ['tests/**/*.test.ts'],
     passWithNoTests: true,
     setupFiles: [fileURLToPath(new URL('./vitest.setup.ts', import.meta.url))],
   },

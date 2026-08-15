@@ -22,8 +22,38 @@ export const canShowClaimButton = (
   queueItem: QueueItem
 ): boolean => canClaim && queueItem.status === 'pending'
 
+export const canShowResolveButton = (
+  canResolve: boolean,
+  queueItem: QueueItem,
+  currentUserId: string
+): boolean =>
+  canResolve &&
+  queueItem.status === 'claimed' &&
+  queueItem.claimerId === currentUserId
+
+export const canShowReleaseButton = (
+  canRelease: boolean,
+  queueItem: QueueItem,
+  currentUserId: string
+): boolean =>
+  canRelease &&
+  queueItem.status === 'claimed' &&
+  queueItem.claimerId === currentUserId
+
 export const getClaimButtonLabel = (rowState: QueueRowState): string =>
-  rowState.kind === 'loading' ? 'Claiming...' : 'Claim'
+  rowState.kind === 'loading' && rowState.action === 'claim'
+    ? 'Claiming...'
+    : 'Claim'
+
+export const getResolveButtonLabel = (rowState: QueueRowState): string =>
+  rowState.kind === 'loading' && rowState.action === 'resolve'
+    ? 'Resolving...'
+    : 'Resolve'
+
+export const getReleaseButtonLabel = (rowState: QueueRowState): string =>
+  rowState.kind === 'loading' && rowState.action === 'release'
+    ? 'Releasing...'
+    : 'Release'
 
 export const getRowFeedbackMessage = (
   rowState: QueueRowState

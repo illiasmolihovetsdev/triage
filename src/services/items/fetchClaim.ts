@@ -1,17 +1,12 @@
 import type { FetchClaimItemResult } from '@/services/items/types'
-import type { ClaimHolder, QueueItem, QueueItemStatus } from '@/types/item'
+import { isQueueItem } from '@/services/items/parseQueueItem'
+import type { ClaimHolder } from '@/types/item'
 import { readErrorMessage } from '@/utils/http'
 
 /*
  * Browser-to-server claim. Lives in its own file so a Client Component can
  * import it without pulling in prisma via services/items/index.ts.
  */
-
-const QUEUE_ITEM_STATUS_LIST: QueueItemStatus[] = [
-  'pending',
-  'claimed',
-  'resolved',
-]
 
 const isClaimHolder = (value: unknown): value is ClaimHolder =>
   typeof value === 'object' &&
@@ -20,29 +15,6 @@ const isClaimHolder = (value: unknown): value is ClaimHolder =>
   'name' in value &&
   typeof value.id === 'string' &&
   typeof value.name === 'string'
-
-const QUEUE_NOTIFICATION_STATUS_LIST = ['pending', 'sent', 'failed'] as const
-
-const isQueueItem = (value: unknown): value is QueueItem =>
-  typeof value === 'object' &&
-  value !== null &&
-  'id' in value &&
-  'title' in value &&
-  'status' in value &&
-  'claimerId' in value &&
-  'claimerName' in value &&
-  'notificationStatus' in value &&
-  typeof value.id === 'string' &&
-  typeof value.title === 'string' &&
-  typeof value.status === 'string' &&
-  QUEUE_ITEM_STATUS_LIST.includes(value.status as QueueItemStatus) &&
-  (value.claimerId === null || typeof value.claimerId === 'string') &&
-  (value.claimerName === null || typeof value.claimerName === 'string') &&
-  (value.notificationStatus === null ||
-    (typeof value.notificationStatus === 'string' &&
-      QUEUE_NOTIFICATION_STATUS_LIST.includes(
-        value.notificationStatus as (typeof QUEUE_NOTIFICATION_STATUS_LIST)[number]
-      )))
 
 const readClaimConflict = async (
   response: Response

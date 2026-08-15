@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through the atomic claim
-endpoint. The queue UI does not yet claim, so R1 is not finished. Resolve,
-release, and R3 are not implemented yet.
+Everything below reflects the state of the project through resolve and release
+(R1 complete, R2 mutations in place). R3 notification on resolve is not
+implemented yet: a resolve currently changes item status only.
 
 ## 1. Project structure
 
@@ -22,6 +22,7 @@ src/
   lib/          infrastructure primitives (database, session, authorization)
   types/        types shared across folders
   utils/        pure helpers shared across folders
+tests/          unit tests, mirroring src/ so source folders stay logic-only
 ```
 
 A component folder holds `index.tsx` plus, as needed, `types.ts` for its props,
@@ -45,7 +46,9 @@ component tree:
 - `services/auth/` makes browser-to-server calls.
 - `services/users/` queries the database and begins with `import 'server-only'`.
 - `services/items/` and `services/memberships/` load the rows authorization
-  needs, and `services/items/` also loads the capped queue page.
+  needs. `services/items/` also loads the capped queue page and performs claim,
+  resolve, and release writes. Browser-to-server calls for those mutations live
+  in separate files so Client Components never import Prisma.
 
 That import is a guard rather than decoration. Importing a database module from
 a client component becomes a build error instead of a bundle that quietly ships
@@ -117,7 +120,7 @@ Revoking a role takes effect on the next request rather than whenever the cookie
 happens to expire.
 
 `src/lib/session.ts` deliberately imports neither Next.js nor Prisma. That is
-what lets `src/lib/session.test.ts` test the token rules directly, including
+what lets `tests/lib/session.test.ts` test the token rules directly, including
 tampering with the payload, tampering with the signature, expiry, a wrong
 secret, and the `alg: none` case.
 
@@ -154,9 +157,10 @@ the first version of this script produced 10,000 identical statuses. The fix was
 
 ## 6. Authorization
 
-Every protected item operation will go through `requireItemAction` in
+Every protected item operation goes through `requireItemAction` in
 `src/lib/authz.ts`. Queue listing goes through `requireCallerMembership` in the
-same file. There are no item mutation routes yet.
+same file. Claim, resolve, and release Route Handlers all call
+`requireItemAction` before they write.
 
 The check is:
 
@@ -179,8 +183,9 @@ lets the matrix be tested without a request or a database, which is the part
 most likely to be implemented incorrectly: mixing "you may not" with "this item
 is not here" would leak existence to anyone who can paste an ID into curl.
 
-The UI may later hide buttons using `canRolePerformAction`. That is display
-only. Curl still has to pass through `requireItemAction`.
+The UI hides claim, resolve, and release using `canRolePerformAction` plus,
+for resolve and release, a check that the current user is the claimer. That is
+display only. Curl still has to pass through `requireItemAction`.
 
 ## 7. Queue listing
 
@@ -198,9 +203,11 @@ out of how many exist so the limit is visible.
 Unauthenticated visits redirect to `/` from the queue layout, before
 `loading.tsx` can render. Signing in navigates to `/queue`. Signing out
 navigates to `/`. Isolation is: Alice's queue titles start with `Support`,
-Erin's with `Billing`. A viewer sees the same rows as a member, without a
-Claim button. That hiding is display only; `POST /api/items/[id]/claim` still
-rejects them with 403.
+Erin's with `Billing`. A viewer sees the same rows as a member, without claim,
+resolve, or release buttons. A member who does not hold a claimed row sees
+neither Resolve nor Release on it. That hiding is display only; the matching
+`POST` still rejects a viewer with 403 and a non-claimer with 403
+`NOT_CLAIMER`.
 
 ## 8. Concurrent claiming
 
@@ -229,7 +236,7 @@ response can be retried without turning into a conflict against yourself.
 Viewers never reach the `UPDATE` (**403**). A user from another workspace gets
 the same **404** as an unknown item. Unauthenticated requests get **401**.
 
-The queue does not wait for a full refresh. `useQueueClaims` keeps a local copy
+The queue does not wait for a full refresh. `useQueueActions` keeps a local copy
 of the rows. A 200 replaces that row with the returned item. A 409 patches
 status and claimer from `claimedBy` and shows "Already claimed by …" on that
 row. There is no optimistic claim: the button stays on Claiming... until the
@@ -246,3 +253,45 @@ two members, fires both claims at once, checks the 200/409 pair against the
 database row, and deletes the item. `npm test` still covers the UPDATE itself;
 `verify:r1` is the assignment's runnable proof that the Route Handler does not
 undo it.
+
+## 9. Resolve and release
+
+`POST /api/items/[id]/resolve` and `POST /api/items/[id]/release` follow the
+same shape as claim: `requireItemAction` first, then one conditional update.
+
+Resolve:
+
+```sql
+UPDATE "Item"
+SET status = 'RESOLVED', "resolvedAt" = now()
+WHERE id = $itemId AND status = 'CLAIMED' AND "claimedById" = $userId
+```
+
+Release:
+
+```sql
+UPDATE "Item"
+SET status = 'PENDING', "claimedById" = NULL, "claimedAt" = NULL
+WHERE id = $itemId AND status = 'CLAIMED' AND "claimedById" = $userId
+```
+
+The claimer check is therefore enforced twice. `requireItemAction` returns 403
+`NOT_CLAIMER` before the write. The `WHERE` clause is the backstop: a caller
+who is not the current claimer, or an item that is no longer `CLAIMED`, matches
+zero rows. The loser of that write receives **409** with the current item so
+the row can update without a refresh.
+
+RESOLVED is terminal. Release does not clear `resolvedAt` because a `CLAIMED`
+row cannot have one; the CHECK constraint already forbids that combination.
+Owners have the same item permissions as members. They cannot resolve or
+release someone else's claim.
+
+A lost resolve response can be retried: the item is still `RESOLVED` with this
+caller as claimer, so the second request returns **200**. A lost release
+response cannot: after release the item is `PENDING` with no claimer, so
+authorization returns 403 `NOT_CLAIMER`. That is honest rather than pretending
+the retry still holds the claim.
+
+These routes do not send a notification. R3 will insert `NotificationAttempt`
+in the same transaction as resolve and dispatch after the response. Until then
+a resolve is only a status change.

@@ -1,7 +1,9 @@
+import 'server-only'
+
 import type { PrismaClient } from '@/generated/prisma/client'
 import { prisma } from '@/lib/db'
+import { fetchQueueItemRecord } from '@/services/items/records'
 import type { ClaimItemResult } from '@/services/items/types'
-import { QUEUE_ITEM_SELECT } from '@/services/items/types'
 import { mapQueueItem } from '@/services/items/utils'
 import type { ClaimHolder } from '@/types/item'
 
@@ -18,12 +20,6 @@ const getClaimConflictMessage = (claimedBy: ClaimHolder | null): string =>
   claimedBy
     ? `Already claimed by ${claimedBy.name}.`
     : 'This item is no longer available to claim.'
-
-const fetchQueueItemRecord = (database: PrismaClient, itemId: string) =>
-  database.item.findUnique({
-    where: { id: itemId },
-    select: QUEUE_ITEM_SELECT,
-  })
 
 export const claimItemWithClient = async (
   database: PrismaClient,

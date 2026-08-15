@@ -1,7 +1,7 @@
 'use client'
 
 import { QueueRow } from '@/components/QueueTable/QueueRow'
-import { useQueueClaims } from '@/components/QueueTable/hooks'
+import { useQueueActions } from '@/components/QueueTable/hooks'
 import type { QueueTableProps } from '@/components/QueueTable/types'
 import { getQueueCountLabel } from '@/components/QueueTable/utils'
 
@@ -9,9 +9,18 @@ export const QueueTable = ({
   itemList: initialItemList,
   shownCount,
   totalCount,
+  currentUserId,
   canClaim,
+  canResolve,
+  canRelease,
 }: QueueTableProps) => {
-  const { itemList, getRowState, handleClaim } = useQueueClaims(initialItemList)
+  const {
+    itemList,
+    getRowState,
+    handleClaim,
+    handleResolve,
+    handleRelease,
+  } = useQueueActions(initialItemList)
   const countLabel = getQueueCountLabel(shownCount, totalCount)
 
   if (itemList.length === 0) {
@@ -43,8 +52,13 @@ export const QueueTable = ({
               key={queueItem.id}
               queueItem={queueItem}
               rowState={getRowState(queueItem.id)}
+              currentUserId={currentUserId}
               canClaim={canClaim}
+              canResolve={canResolve}
+              canRelease={canRelease}
               onClaim={handleClaim}
+              onResolve={handleResolve}
+              onRelease={handleRelease}
             />
           ))}
         </tbody>

@@ -188,12 +188,12 @@ The implementation must explicitly decide:
 - what happens when an already-resolved item is modified
 - which fields are cleared when a claim is released
 
-Record these decisions in `DECISIONS.md`.
+These are recorded in `IMPLEMENTATION.md` as they ship. `DECISIONS.md` is
+written at the end against what actually landed.
 
 ## 8. R1 — Concurrent claiming
 
-Implemented on the server. See `IMPLEMENTATION.md` section 8. The queue UI does
-not yet reconcile a lost claim.
+Implemented on the server and in the queue UI. See `IMPLEMENTATION.md` section 8.
 
 ### Requirement
 
