@@ -2,10 +2,9 @@
 
 What the running system actually does today, and why it is built this way.
 
-`ARCHITECTURE.md` is the forward-looking design document and still contains open
-questions. This document is the opposite: it describes only what is implemented
-and verified. If the two disagree, this one is right, and the architecture
-document needs updating.
+`ARCHITECTURE.md` is the design rationale. This document describes only what
+is implemented and verified. Trade-offs live in `DECISIONS.md`. If those
+files disagree with the architecture notes, these two are right.
 
 Everything below reflects the state of the project through R3. Production is
 [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).

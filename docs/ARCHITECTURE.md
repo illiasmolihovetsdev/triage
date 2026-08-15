@@ -2,16 +2,15 @@
 
 ## Status
 
-This document describes the current architectural direction of the Triage application.
+This document is the design rationale for what shipped: R1, R2, and R3 on
+Next.js App Router, Prisma, Supabase Postgres, and Vercel.
 
-Some implementation decisions are intentionally left open until the relevant requirement is analyzed.
+`IMPLEMENTATION.md` is the description of the running system. `DECISIONS.md`
+is the trade-off record. Where those two disagree with this file, they are
+right.
 
-It is a design document, so parts of it describe intent rather than code. For what
-is actually built and running — project structure, database invariants, row level
-security, authentication, and seed data — see `IMPLEMENTATION.md`. Where the two
-disagree, `IMPLEMENTATION.md` is the truthful one.
-
-Final architectural decisions should be reflected in `DECISIONS.md`.
+R4 (stable pagination) and R5 (expiring claims) were not implemented. The
+intended approaches are in `DECISIONS.md`.
 
 ## 1. System overview
 
@@ -22,7 +21,7 @@ The application uses a single Next.js codebase for both the frontend and server-
 Core layers:
 
 - UI: Next.js App Router, React, Tailwind CSS
-- Server: Next.js Server Actions and/or Route Handlers
+- Server: Route Handlers for mutations; Server Components for reads
 - Business logic: authentication, authorization, and item operations
 - ORM: Prisma
 - Database: Supabase PostgreSQL
@@ -92,13 +91,11 @@ Potential fields:
 
 The final schema should be based on the required state transitions and concurrency requirements.
 
-### Notification / NotificationAttempt
+### NotificationAttempt
 
-R3 may require a durable record representing notification work or its result.
-
-The final model depends on the notification guarantee selected for the implementation.
-
-Do not introduce this model purely for abstraction. Introduce it only if required to provide the selected guarantee or prevent important state from being lost.
+One row per resolved item (`itemId` unique). Status is `PENDING`, `SENT`, or
+`FAILED`. It exists so a notification failure is visible and cannot undo
+resolve. See `DECISIONS.md` decision 4.
 
 ## 3. Authentication
 
@@ -179,17 +176,19 @@ The intended lifecycle is:
 - `CLAIMED` -> `RESOLVED` when the item is resolved.
 - `CLAIMED` -> `PENDING` when the claim is released.
 
-The implementation must explicitly decide:
+Shipped rules:
 
-- whether resolved items can become active again
-- whether users can release another user's claim
-- whether owners have different permissions from members
-- what happens when an already-claimed item is claimed
-- what happens when an already-resolved item is modified
-- which fields are cleared when a claim is released
+- `RESOLVED` is terminal. It cannot become `PENDING` or `CLAIMED` again.
+- Only the current claimer can resolve or release. Owners do not override this.
+- `owner` and `member` have the same item permissions. `viewer` is read-only.
+- Claiming an item you already hold is idempotent 200.
+- Claiming an item someone else holds is 409 with the current holder.
+- A write against a resolved item matches zero rows and returns 409 with the current item.
+- Release clears `claimedById` and `claimedAt` and sets `status` to `PENDING`.
+  `resolvedAt` is already null on a `CLAIMED` row; the CHECK constraint forbids
+  the other combination.
 
-These are recorded in `IMPLEMENTATION.md` as they ship. `DECISIONS.md` is
-written at the end against what actually landed.
+Details: `IMPLEMENTATION.md` sections 8–9. Trade-offs: `DECISIONS.md`.
 
 ## 8. R1 — Concurrent claiming
 
@@ -220,24 +219,14 @@ A simple sequence of:
 
 is not sufficient unless protected by an appropriate transaction or atomic database operation.
 
-### Candidate approaches
+### Chosen approach
 
-Compare:
+One conditional `UPDATE … WHERE id = $id AND status = 'PENDING'`, issued as
+Prisma `updateMany`. PostgreSQL is the referee. The loser is 409 with the
+current holder. Self-claim is 200.
 
-- atomic conditional update
-- transaction with row-level locking or appropriate isolation
-- other PostgreSQL concurrency mechanisms supported by Prisma
-
-Evaluate:
-
-- correctness
-- PostgreSQL behavior
-- Prisma support
-- complexity
-- error handling
-- observability
-
-The final decision belongs in `DECISIONS.md`.
+Rejected: `SELECT FOR UPDATE` then update. Same lock, more round trips.
+See `DECISIONS.md` decision 1.
 
 ## 9. R1 — UI reconciliation
 
@@ -273,7 +262,10 @@ A protected operation should:
 6. execute the business operation
 7. return an explicit result
 
-The exact placement may vary depending on whether Server Actions, Route Handlers, or both are used.
+Placement: `requireItemAction` in `src/lib/authz.ts`, called from each item
+Route Handler before the write. Middleware is not the boundary: it cannot
+see `item.workspaceId`. Cross-workspace access is 404. See `DECISIONS.md`
+decision 3.
 
 ## 11. R3 — Notification architecture
 
@@ -358,27 +350,27 @@ Potential cost:
 - unnecessary complexity for this assignment
 - possible conflict with the free-tier constraint
 
-The final approach should be selected after analyzing the assignment constraints.
+### Chosen approach
+
+Resolve and the `NotificationAttempt` insert are one transaction. The
+response returns before `notify()`. `after()` (`waitUntil`) attempts
+delivery once and writes `SENT` or `FAILED`. `FAILED` is not retried.
 
 ## 12. Notification guarantee
 
-The implementation must explicitly state the guarantee it actually provides.
+**Actual guarantee: `best-effort-with-a-record`.**
 
-Possible guarantees:
+Not at-least-once (no retry of `FAILED`). Not at-most-once without a
+record (`after()` alone would drop ~20% silently). The record itself can
+stay `PENDING` if the invocation dies or the status write fails after a
+successful `notify()`.
 
-- `at-most-once`
-- `at-least-once`
-- `best-effort-with-a-record`
-
-Documentation must not claim stronger behavior than the implementation provides.
-
-Record the selected guarantee in `DECISIONS.md`.
+See `DECISIONS.md` decision 4 and `IMPLEMENTATION.md` section 10.
 
 ## 13. Database responsibilities
 
-Partly implemented. The schema, the `CHECK` constraints covering item state and
-notification records, and row level security are described in
-`IMPLEMENTATION.md` sections 2 and 3. Claim concurrency remains open until R1.
+Implemented. Schema, CHECK constraints, RLS with no policies, and the
+claim `UPDATE` are described in `IMPLEMENTATION.md` sections 2, 3, and 8.
 
 PostgreSQL should enforce important invariants whenever practical.
 
@@ -398,64 +390,21 @@ Avoid adding indexes without a query or constraint that benefits from them.
 
 ## 14. Pagination
 
-R4 is optional.
-
-If implemented, the queue should not be fetched in full.
-
-Evaluate:
-
-- offset pagination
-- cursor/keyset pagination
-- stable ordering
-- filtering
-- concurrent modifications
-- deep-page performance
-
-Document:
-
-- pagination strategy
-- ordering strategy
-- failure mode
-- relevant indexes
-- `EXPLAIN ANALYZE` for the naive deep-page query
-- `EXPLAIN ANALYZE` for the selected approach
+R4 was not implemented. The queue loads at most 50 rows, newest first.
+That cap is not pagination. The keyset approach and its failure mode are
+in `DECISIONS.md`.
 
 ## 15. Claim expiration
 
-R5 is optional.
-
-Claims older than 30 minutes should become available again.
-
-Vercel does not provide a permanently running process, so the implementation must define how expiration is triggered.
-
-Potential approaches:
-
-- scheduled execution
-- lazy expiration during normal requests
-- database-side logic
-- external scheduler
-
-Also define the race between claim expiration and a late resolve request.
+R5 was not implemented. Nothing sweeps stale claims. The lazy-`UPDATE`
+approach and the late-resolve race are in `DECISIONS.md`.
 
 ## 16. Server/API boundary
 
 The application should use Next.js for both frontend and backend functionality.
 
-Possible server-side mechanisms:
-
-- Server Actions
-- Route Handlers
-- a combination
-
-Selection criteria:
-
-- explicit authorization
-- testability
-- clear error handling
-- simple client/server boundaries
-- minimal unnecessary infrastructure
-
-Do not introduce a separate backend service unless a concrete requirement justifies it.
+Mutations use Route Handlers. Reads use Server Components. There is no
+separate backend service. See `DECISIONS.md` decision 2.
 
 ## 17. Error model
 
@@ -563,25 +512,7 @@ Potential future requirements may include:
 
 Do not implement these prematurely.
 
-## 21. Open decisions
+## 21. Decisions
 
-Settled so far:
-
-- exact Prisma/database schema — see `IMPLEMENTATION.md` section 2
-- item status representation — `PENDING`, `CLAIMED`, `RESOLVED`, with the
-  status-to-columns agreement enforced by a `CHECK` constraint
-- mutations use Route Handlers; reads use Server Components
-- authorization placement — `requireItemAction` in `src/lib/authz.ts`; workspace
-  derived from the item row; cross-workspace access is 404; role failure is 403;
-  only the current claimer may resolve or release
-- claim concurrency — one `updateMany` with `status: 'PENDING'`; loser is 409
-  with the current holder; self-claim is idempotent 200
-
-Still open, to finalize during implementation:
-
-- notification delivery model
-- notification guarantee
-- pagination strategy if R4 is implemented
-- claim expiration strategy if R5 is implemented
-
-Final decisions should be recorded in `DECISIONS.md`.
+Closed. The four scored choices, the three deliberate skips (R4, R5,
+notification retries), and the first refactor are in `DECISIONS.md`.

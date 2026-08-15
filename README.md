@@ -26,7 +26,7 @@ today, not what is planned.
 | R1 — exactly one winner per claim | Done (`npm run verify:r1`) |
 | R2 — workspace isolation and roles | Done (`npm run verify:r2`) |
 | R3 — resolve and notify | Done (sent/failed appear on the open row) |
-| R4, R5 (optional) | Not planned in this iteration |
+| R4, R5 (optional) | Skipped; approach in `DECISIONS.md` |
 
 ## Setup
 
@@ -213,6 +213,6 @@ npm run verify:r2   # workspace isolation and roles over HTTP; app must be runni
 
 - `docs/IMPLEMENTATION.md` — how the running system works: structure, database
   invariants, authentication, seed data
-- `docs/ARCHITECTURE.md` — architectural direction and the reasoning behind it
-- `DECISIONS.md` — key decisions, rejected alternatives, and their costs (pending)
-- `AI_USAGE.md` — where AI was used and how its output was verified (pending)
+- `docs/ARCHITECTURE.md` — design rationale for what shipped
+- `DECISIONS.md` — four choices, three skips, first refactor
+- `AI_USAGE.md` — where AI was used, two disagreements, how output was verified
