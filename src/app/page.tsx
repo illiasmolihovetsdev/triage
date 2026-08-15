@@ -31,7 +31,10 @@ export default async function HomePage() {
         <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
           {currentUser ? 'Switch user' : 'Seeded users'}
         </h2>
-        <UserPicker userOptionList={userOptionList} />
+        <UserPicker
+          userOptionList={userOptionList}
+          currentUserId={currentUser?.id ?? null}
+        />
       </section>
     </main>
   )

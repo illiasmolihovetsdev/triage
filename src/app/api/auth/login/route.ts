@@ -1,10 +1,17 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import {
   SESSION_COOKIE_NAME,
   createSessionToken,
   getSessionCookieOptions,
+  readSessionToken,
 } from '@/lib/session'
+import {
+  ALREADY_SIGNED_IN_CODE,
+  ALREADY_SIGNED_IN_MESSAGE,
+  isAlreadySignedInAsRequestedUser,
+} from '@/utils/login'
 
 interface LoginRequestBody {
   userId?: unknown
@@ -19,6 +26,9 @@ interface LoginRequestBody {
  * roles and workspace membership are always read from the database at the
  * point where they are enforced, never carried in the cookie, so a session
  * cannot outlive or contradict the current membership rows.
+ *
+ * Repeating the current session user is refused. The picker already disables
+ * that row; this check is the real boundary if the client is bypassed.
  */
 export const POST = async (request: Request) => {
   let body: LoginRequestBody
@@ -38,6 +48,18 @@ export const POST = async (request: Request) => {
     return NextResponse.json(
       { code: 'INVALID_BODY', message: 'userId is required.' },
       { status: 400 }
+    )
+  }
+
+  const cookieStore = await cookies()
+  const sessionUserId = await readSessionToken(
+    cookieStore.get(SESSION_COOKIE_NAME)?.value
+  )
+
+  if (isAlreadySignedInAsRequestedUser(sessionUserId, userId)) {
+    return NextResponse.json(
+      { code: ALREADY_SIGNED_IN_CODE, message: ALREADY_SIGNED_IN_MESSAGE },
+      { status: 409 }
     )
   }
 

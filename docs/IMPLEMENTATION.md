@@ -100,6 +100,9 @@ where it can be read, tested, and reasoned about in one place.
 
 There is no OAuth, by design; the assignment asks for seeded-user selection. The
 home page lists the seeded users, and signing in as one sets a session cookie.
+Signing in as the user who already owns the session is rejected: the Sign in
+button for that row is disabled, and `POST /api/auth/login` returns 409 if the
+request still arrives. Switching to a different seeded user is still allowed.
 
 What matters is that the identity cannot be edited after the fact:
 

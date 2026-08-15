@@ -4,6 +4,10 @@ import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { fetchSignIn } from '@/services/auth'
 import type { UseSignInResult } from '@/components/UserPicker/types'
+import {
+  ALREADY_SIGNED_IN_MESSAGE,
+  isAlreadySignedInAsRequestedUser,
+} from '@/utils/login'
 
 /*
  * Sign-in state for the picker.
@@ -13,13 +17,18 @@ import type { UseSignInResult } from '@/components/UserPicker/types'
  * reflects the session the server actually issued rather than an optimistic
  * guess made in the browser.
  */
-export const useSignIn = (): UseSignInResult => {
+export const useSignIn = (currentUserId: string | null): UseSignInResult => {
   const router = useRouter()
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const handleSignIn = useCallback(
     async (userId: string) => {
+      if (isAlreadySignedInAsRequestedUser(currentUserId, userId)) {
+        setErrorMessage(ALREADY_SIGNED_IN_MESSAGE)
+        return
+      }
+
       setPendingUserId(userId)
       setErrorMessage(null)
 
@@ -33,7 +42,7 @@ export const useSignIn = (): UseSignInResult => {
 
       router.refresh()
     },
-    [router]
+    [router, currentUserId]
   )
 
   return {

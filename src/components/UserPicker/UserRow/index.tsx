@@ -10,10 +10,22 @@ import type { UserRowProps } from '@/components/UserPicker/UserRow/types'
  * mean a new arrow function per row per render, which defeats the memo on Button.
  */
 export const UserRow = memo(
-  ({ userOption, isPending, isDisabled, onSignIn }: UserRowProps) => {
+  ({
+    userOption,
+    isPending,
+    isDisabled,
+    isSignedIn,
+    onSignIn,
+  }: UserRowProps) => {
     const handleSignInClick = useCallback(() => {
       onSignIn(userOption.id)
     }, [onSignIn, userOption.id])
+
+    const buttonLabel = isSignedIn
+      ? 'Signed in'
+      : isPending
+        ? 'Signing in...'
+        : 'Sign in'
 
     return (
       <tr className="border-b border-zinc-200">
@@ -25,9 +37,9 @@ export const UserRow = memo(
         <td className="py-2 pr-4 text-zinc-700">{userOption.role}</td>
         <td className="py-2 text-right">
           <Button
-            label={isPending ? 'Signing in...' : 'Sign in'}
+            label={buttonLabel}
             onClick={handleSignInClick}
-            isDisabled={isDisabled}
+            isDisabled={isDisabled || isSignedIn}
           />
         </td>
       </tr>

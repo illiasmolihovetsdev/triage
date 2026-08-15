@@ -2,6 +2,7 @@ import type { UserOption } from '@/types/user'
 
 export interface UserPickerProps {
   userOptionList: UserOption[]
+  currentUserId: string | null
 }
 
 export interface UseSignInResult {
