@@ -19,6 +19,7 @@ today, not what is planned.
 | --- | --- |
 | Scaffold, schema, seed data | Done |
 | Authentication (seeded users, signed cookie) | Done |
+| Authorization module (item → workspace → role) | Done |
 | R1 — exactly one winner per claim | Not started |
 | R2 — workspace isolation and roles | Not started |
 | R3 — resolve and notify | Not started |

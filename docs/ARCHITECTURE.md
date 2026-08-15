@@ -118,6 +118,9 @@ The client must not be trusted to define the current user.
 
 ## 4. Authorization
 
+Implemented. See `IMPLEMENTATION.md` section 6 for the delivered check, the
+401/403/404 distinction, and why the decision is a pure function.
+
 Authorization is a server-side concern.
 
 Every protected operation should establish:
@@ -562,11 +565,13 @@ Settled so far:
 - item status representation — `PENDING`, `CLAIMED`, `RESOLVED`, with the
   status-to-columns agreement enforced by a `CHECK` constraint
 - mutations use Route Handlers; reads use Server Components
+- authorization placement — `requireItemAction` in `src/lib/authz.ts`; workspace
+  derived from the item row; cross-workspace access is 404; role failure is 403;
+  only the current claimer may resolve or release
 
 Still open, to finalize during implementation:
 
 - claim concurrency strategy
-- authorization placement
 - notification delivery model
 - notification guarantee
 - pagination strategy if R4 is implemented

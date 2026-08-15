@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through authentication. R1,
-R2, and R3 are not implemented yet and are therefore absent here rather than
-described optimistically.
+Everything below reflects the state of the project through the authorization
+module. Item mutations, the queue UI, R1, R2 routes, and R3 are not implemented
+yet and are therefore absent here rather than described optimistically.
 
 ## 1. Project structure
 
@@ -44,6 +44,9 @@ component tree:
 
 - `services/auth/` makes browser-to-server calls.
 - `services/users/` queries the database and begins with `import 'server-only'`.
+- `services/items/` and `services/memberships/` load the two rows authorization
+  needs: the item (so the workspace comes from the database) and the membership
+  for that workspace.
 
 That import is a guard rather than decoration. Importing a database module from
 a client component becomes a build error instead of a bundle that quietly ships
@@ -146,3 +149,33 @@ than ten thousand round trips. One subtlety worth recording: `random()` in an
 uncorrelated `CROSS JOIN LATERAL` is evaluated once for the whole statement, so
 the first version of this script produced 10,000 identical statuses. The fix was
 `MATERIALIZED` CTEs, which force per-row evaluation.
+
+## 6. Authorization
+
+Every protected item operation will go through `requireItemAction` in
+`src/lib/authz.ts`. There are no item routes yet; the module exists first so the
+first mutation cannot ship without a security boundary.
+
+The check is:
+
+1. Resolve the caller from the signed cookie. No user → **401**.
+2. Load the item by ID. The workspace comes from that row, never from a
+   client-supplied workspace ID. Unknown item → **404**.
+3. Load membership for `(userId, item.workspaceId)`. No row → **404**, the same
+   body as an unknown item, so a stolen ID from another workspace does not
+   confirm that the item exists.
+4. Check the role against the action. A viewer may `read` and nothing else.
+   Owners and members may `read`, `claim`, `resolve`, and `release`. Failure →
+   **403**.
+5. `resolve` and `release` also require `item.claimedById === caller.id`. Owners
+   do not override this. Failure → **403** with code `NOT_CLAIMER`.
+
+The role matrix and the 401/403/404 distinction are a pure function in
+`src/utils/authorization.ts`. `requireItemAction` only loads the three facts
+that function needs (user, item, membership) and asks it. That split is what
+lets the matrix be tested without a request or a database, which is the part
+most likely to be implemented incorrectly: mixing "you may not" with "this item
+is not here" would leak existence to anyone who can paste an ID into curl.
+
+The UI may later hide buttons using `canRolePerformAction`. That is display
+only. Curl still has to pass through `requireItemAction`.
