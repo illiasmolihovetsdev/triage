@@ -1,25 +1,11 @@
 import type { AuthRequestResult } from '@/services/auth/types'
+import { readErrorMessage } from '@/utils/http'
 
 /*
  * Browser-to-server calls for authentication. Components never call fetch
  * directly: keeping the transport here means a change to the endpoint, the
  * payload, or the error shape happens in one place.
  */
-
-const readErrorMessage = async (
-  response: Response,
-  fallbackMessage: string
-): Promise<string> => {
-  try {
-    const failureBody = await response.json()
-
-    return typeof failureBody?.message === 'string'
-      ? failureBody.message
-      : fallbackMessage
-  } catch {
-    return fallbackMessage
-  }
-}
 
 export const fetchSignIn = async (
   userId: string

@@ -241,6 +241,9 @@ The final decision belongs in `DECISIONS.md`.
 
 ## 9. R1 — UI reconciliation
 
+Implemented. See `IMPLEMENTATION.md` section 8. The losing row is patched from
+the 409 body; the page is not refreshed.
+
 The UI must represent both claim outcomes clearly.
 
 Successful claim:

@@ -42,3 +42,13 @@ export type ClaimItemResult =
       code: 'NOT_FOUND'
       message: string
     }
+
+export type FetchClaimItemResult =
+  | { isSuccess: true; item: QueueItem }
+  | {
+      isSuccess: false
+      code: 'CLAIM_CONFLICT'
+      message: string
+      claimedBy: ClaimHolder | null
+    }
+  | { isSuccess: false; errorMessage: string }

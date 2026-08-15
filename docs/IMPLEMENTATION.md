@@ -197,9 +197,10 @@ out of how many exist so the limit is visible.
 
 Unauthenticated visits redirect to `/` from the queue layout, before
 `loading.tsx` can render. Signing in navigates to `/queue`. Signing out
-navigates to `/`. A viewer sees the same table as a member; there are no
-action buttons yet, so the role difference is not visible in the UI.
-Isolation is: Alice's queue titles start with `Support`, Erin's with `Billing`.
+navigates to `/`. Isolation is: Alice's queue titles start with `Support`,
+Erin's with `Billing`. A viewer sees the same rows as a member, without a
+Claim button. That hiding is display only; `POST /api/items/[id]/claim` still
+rejects them with 403.
 
 ## 8. Concurrent claiming
 
@@ -228,4 +229,8 @@ response can be retried without turning into a conflict against yourself.
 Viewers never reach the `UPDATE` (**403**). A user from another workspace gets
 the same **404** as an unknown item. Unauthenticated requests get **401**.
 
-The queue table still has no claim button. This step is the server contract.
+The queue does not wait for a full refresh. `useQueueClaims` keeps a local copy
+of the rows. A 200 replaces that row with the returned item. A 409 patches
+status and claimer from `claimedBy` and shows "Already claimed by …" on that
+row. There is no optimistic claim: the button stays on Claiming... until the
+server answers, so the table cannot show a holder the database rejected.

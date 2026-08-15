@@ -4,6 +4,7 @@ import { CurrentUserBar } from '@/components/CurrentUserBar'
 import { QueueTable } from '@/components/QueueTable'
 import { requireCallerMembership } from '@/lib/authz'
 import { fetchQueuePage } from '@/services/items'
+import { canRolePerformAction } from '@/utils/authorization'
 
 export default async function QueuePage() {
   const callerMembershipResult = await requireCallerMembership()
@@ -33,6 +34,7 @@ export default async function QueuePage() {
   const { user, membership } = callerMembershipResult
   const queuePageResult = await fetchQueuePage(membership.workspaceId)
   const membershipLabel = `${membership.workspaceName} · ${membership.role.toLowerCase()}`
+  const canClaim = canRolePerformAction(membership.role, 'claim')
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -41,7 +43,8 @@ export default async function QueuePage() {
           <div>
             <h1 className="text-xl font-semibold text-zinc-900">Queue</h1>
             <p className="mt-1 text-sm text-zinc-600">
-              {membership.workspaceName}. No actions yet — claiming arrives next.
+              {membership.workspaceName}. Claim is exclusive: if two people
+              click at once, one wins and the other sees who holds it.
             </p>
           </div>
           <Link href="/" className="text-sm underline">
@@ -60,6 +63,7 @@ export default async function QueuePage() {
           itemList={queuePageResult.itemList}
           shownCount={queuePageResult.shownCount}
           totalCount={queuePageResult.totalCount}
+          canClaim={canClaim}
         />
       ) : (
         <p

@@ -22,7 +22,8 @@ today, not what is planned.
 | Authorization module (item → workspace → role) | Done |
 | Workspace-scoped queue view | Done |
 | Atomic claim endpoint (R1 server) | Done |
-| R1 — exactly one winner per claim | Server done, UI not started |
+| Claim UI reconciliation (R1) | Done |
+| R1 — exactly one winner per claim | UI done; HTTP verify script not started |
 | R2 — workspace isolation and roles | Not started |
 | R3 — resolve and notify | Not started |
 | R4, R5 (optional) | Not planned in this iteration |
