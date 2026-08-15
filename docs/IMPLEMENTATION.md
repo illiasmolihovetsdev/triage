@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through the authorization
-module. Item mutations, the queue UI, R1, R2 routes, and R3 are not implemented
-yet and are therefore absent here rather than described optimistically.
+Everything below reflects the state of the project through the read-only queue.
+Item mutations, R1, R2 write routes, and R3 are not implemented yet and are
+therefore absent here rather than described optimistically.
 
 ## 1. Project structure
 
@@ -44,9 +44,8 @@ component tree:
 
 - `services/auth/` makes browser-to-server calls.
 - `services/users/` queries the database and begins with `import 'server-only'`.
-- `services/items/` and `services/memberships/` load the two rows authorization
-  needs: the item (so the workspace comes from the database) and the membership
-  for that workspace.
+- `services/items/` and `services/memberships/` load the rows authorization
+  needs, and `services/items/` also loads the capped queue page.
 
 That import is a guard rather than decoration. Importing a database module from
 a client component becomes a build error instead of a bundle that quietly ships
@@ -156,8 +155,8 @@ the first version of this script produced 10,000 identical statuses. The fix was
 ## 6. Authorization
 
 Every protected item operation will go through `requireItemAction` in
-`src/lib/authz.ts`. There are no item routes yet; the module exists first so the
-first mutation cannot ship without a security boundary.
+`src/lib/authz.ts`. Queue listing goes through `requireCallerMembership` in the
+same file. There are no item mutation routes yet.
 
 The check is:
 
@@ -182,3 +181,22 @@ is not here" would leak existence to anyone who can paste an ID into curl.
 
 The UI may later hide buttons using `canRolePerformAction`. That is display
 only. Curl still has to pass through `requireItemAction`.
+
+## 7. Queue listing
+
+`/queue` is a Server Component. It does not read a workspace ID from the URL,
+the query string, or the body. `requireCallerMembership` loads the caller's
+memberships from the cookie identity and accepts the request only when there is
+exactly one. Zero or more than one is **403**: guessing a workspace on the
+server is the same class of mistake as trusting one from the client.
+
+The page then loads at most 50 items, newest first (`createdAt`, then `id`).
+That cap is a guard so 10,000 rows never reach the response. It is not
+pagination: there is no next page, and the heading says how many were shown
+out of how many exist so the limit is visible.
+
+Unauthenticated visits redirect to `/` from the queue layout, before
+`loading.tsx` can render. Signing in navigates to `/queue`. Signing out
+navigates to `/`. A viewer sees the same table as a member; there are no
+action buttons yet, so the role difference is not visible in the UI.
+Isolation is: Alice's queue titles start with `Support`, Erin's with `Billing`.

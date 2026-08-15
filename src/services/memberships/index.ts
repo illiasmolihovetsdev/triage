@@ -1,7 +1,10 @@
 import 'server-only'
 
 import { prisma } from '@/lib/db'
-import type { MembershipAuthRecord } from '@/types/authz'
+import type {
+  CallerMembershipRecord,
+  MembershipAuthRecord,
+} from '@/types/authz'
 
 /*
  * Membership is the authorization source of truth. A missing row means the
@@ -20,4 +23,25 @@ export const fetchMembershipAuthRecord = async (
   })
 
   return membershipRecord
+}
+
+export const fetchCallerMembershipList = async (
+  userId: string
+): Promise<CallerMembershipRecord[]> => {
+  const membershipRecordList = await prisma.workspaceMembership.findMany({
+    where: { userId },
+    select: {
+      userId: true,
+      workspaceId: true,
+      role: true,
+      workspace: { select: { name: true } },
+    },
+  })
+
+  return membershipRecordList.map((membershipRecord) => ({
+    userId: membershipRecord.userId,
+    workspaceId: membershipRecord.workspaceId,
+    workspaceName: membershipRecord.workspace.name,
+    role: membershipRecord.role,
+  }))
 }

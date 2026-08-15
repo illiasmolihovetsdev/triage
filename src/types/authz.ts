@@ -50,3 +50,20 @@ export interface AuthorizationDecisionInput {
   membership: MembershipAuthRecord | null
   action: ItemAction
 }
+
+export interface CallerMembershipRecord {
+  userId: string
+  workspaceId: string
+  workspaceName: string
+  role: Role
+}
+
+export type CallerMembershipSuccess = {
+  isAuthorized: true
+  user: AuthenticatedUser
+  membership: CallerMembershipRecord
+}
+
+export type CallerMembershipResult =
+  | CallerMembershipSuccess
+  | AuthorizationFailure

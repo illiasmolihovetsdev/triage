@@ -6,9 +6,8 @@ import { fetchSignOut } from '@/services/auth'
 import type { UseSignOutResult } from '@/components/CurrentUserBar/types'
 
 /*
- * The refresh on success is what re-renders the server tree with the cleared
- * cookie, so the page shows the session the server actually ended rather than
- * an optimistic guess made in the browser.
+ * On success the cookie is already cleared, so navigation to / is a server
+ * render of the signed-out home page rather than an optimistic guess.
  */
 export const useSignOut = (): UseSignOutResult => {
   const router = useRouter()
@@ -27,7 +26,7 @@ export const useSignOut = (): UseSignOutResult => {
       return
     }
 
-    router.refresh()
+    router.push('/')
   }
 
   return { isSigningOut, errorMessage, handleSignOut }

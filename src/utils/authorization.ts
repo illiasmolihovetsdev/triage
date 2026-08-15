@@ -1,9 +1,13 @@
 import type { Role } from '@/generated/prisma/enums'
 import type {
   AuthorizationDecisionInput,
+  AuthorizationFailure,
   AuthorizationResult,
+  CallerMembershipRecord,
+  CallerMembershipResult,
   ItemAction,
 } from '@/types/authz'
+import type { AuthenticatedUser } from '@/types/user'
 
 /*
  * The role matrix and the 401/403/404 decision live here, not in a Route
@@ -33,7 +37,7 @@ export const canRolePerformAction = (
 export const doesActionRequireClaimer = (action: ItemAction): boolean =>
   ACTIONS_THAT_REQUIRE_CLAIMER.includes(action)
 
-const createUnauthenticatedResult = (): AuthorizationResult => ({
+const createUnauthenticatedResult = (): AuthorizationFailure => ({
   isAuthorized: false,
   statusCode: 401,
   code: 'UNAUTHENTICATED',
@@ -114,5 +118,54 @@ export const getAuthorizationDecision = ({
     item,
     role: membership.role,
     workspaceId: item.workspaceId,
+  }
+}
+
+/*
+ * Queue listing never takes a workspace ID from the client. The caller's
+ * memberships are loaded from the cookie identity; this function decides
+ * whether that set is usable.
+ *
+ * The product model is one membership per user. Zero means the session is
+ * valid but there is nothing to show. More than one would force the server to
+ * pick a workspace, which is the same class of mistake as trusting a
+ * client-supplied ID, so it is refused rather than guessed.
+ */
+export const getCallerMembershipDecision = (
+  user: AuthenticatedUser | null,
+  membershipList: CallerMembershipRecord[]
+): CallerMembershipResult => {
+  if (!user) {
+    return createUnauthenticatedResult()
+  }
+
+  const callerMembershipList = membershipList.filter(
+    (membership) => membership.userId === user.id
+  )
+
+  if (callerMembershipList.length === 0) {
+    return {
+      isAuthorized: false,
+      statusCode: 403,
+      code: 'FORBIDDEN',
+      message: 'No workspace membership.',
+    }
+  }
+
+  if (callerMembershipList.length > 1) {
+    return {
+      isAuthorized: false,
+      statusCode: 403,
+      code: 'FORBIDDEN',
+      message: 'Multiple workspace memberships are not supported.',
+    }
+  }
+
+  const [callerMembership] = callerMembershipList
+
+  return {
+    isAuthorized: true,
+    user,
+    membership: callerMembership,
   }
 }

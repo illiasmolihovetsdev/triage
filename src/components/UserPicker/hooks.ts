@@ -12,10 +12,9 @@ import {
 /*
  * Sign-in state for the picker.
  *
- * The component renders; this decides what happens on click. The refresh on
- * success is what makes the server re-render with the new cookie, so the page
- * reflects the session the server actually issued rather than an optimistic
- * guess made in the browser.
+ * The component renders; this decides what happens on click. On success the
+ * cookie is already set, so navigation to /queue is a server render of the
+ * session that was just issued, not an optimistic guess in the browser.
  */
 export const useSignIn = (currentUserId: string | null): UseSignInResult => {
   const router = useRouter()
@@ -39,7 +38,7 @@ export const useSignIn = (currentUserId: string | null): UseSignInResult => {
       return
     }
 
-    router.refresh()
+    router.push('/queue')
   }
 
   return {

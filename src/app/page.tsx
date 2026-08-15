@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth'
 import { fetchUserOptionList } from '@/services/users'
 import { CurrentUserBar } from '@/components/CurrentUserBar'
@@ -21,10 +22,17 @@ export default async function HomePage() {
       </header>
 
       {currentUser ? (
-        <CurrentUserBar
-          userName={currentUser.name}
-          membershipLabel={getMembershipLabel(currentUserOption)}
-        />
+        <>
+          <CurrentUserBar
+            userName={currentUser.name}
+            membershipLabel={getMembershipLabel(currentUserOption)}
+          />
+          <p className="mb-8 text-sm">
+            <Link href="/queue" className="underline">
+              Open queue
+            </Link>
+          </p>
+        </>
       ) : null}
 
       <section>

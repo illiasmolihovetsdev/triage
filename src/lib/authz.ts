@@ -2,9 +2,19 @@ import 'server-only'
 
 import { getCurrentUser } from '@/lib/auth'
 import { fetchItemAuthRecord } from '@/services/items'
-import { fetchMembershipAuthRecord } from '@/services/memberships'
-import { getAuthorizationDecision } from '@/utils/authorization'
-import type { AuthorizationResult, ItemAction } from '@/types/authz'
+import {
+  fetchCallerMembershipList,
+  fetchMembershipAuthRecord,
+} from '@/services/memberships'
+import {
+  getAuthorizationDecision,
+  getCallerMembershipDecision,
+} from '@/utils/authorization'
+import type {
+  AuthorizationResult,
+  CallerMembershipResult,
+  ItemAction,
+} from '@/types/authz'
 
 /*
  * The single entry point for "may this caller do this to this item?".
@@ -53,4 +63,16 @@ export const requireItemAction = async (
     membership: membershipAuthRecord,
     action,
   })
+}
+
+export const requireCallerMembership = async (): Promise<CallerMembershipResult> => {
+  const currentUser = await getCurrentUser()
+
+  if (!currentUser) {
+    return getCallerMembershipDecision(null, [])
+  }
+
+  const membershipList = await fetchCallerMembershipList(currentUser.id)
+
+  return getCallerMembershipDecision(currentUser, membershipList)
 }

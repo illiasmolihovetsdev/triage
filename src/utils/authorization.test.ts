@@ -3,6 +3,7 @@ import {
   canRolePerformAction,
   doesActionRequireClaimer,
   getAuthorizationDecision,
+  getCallerMembershipDecision,
 } from '@/utils/authorization'
 import type {
   AuthorizationDecisionInput,
@@ -347,6 +348,67 @@ describe('getAuthorizationDecision', () => {
       isAuthorized: false,
       statusCode: 404,
       code: 'NOT_FOUND',
+    })
+  })
+})
+
+describe('getCallerMembershipDecision', () => {
+  const aliceSupportMembership = {
+    userId: alice.id,
+    workspaceId: SUPPORT_WORKSPACE_ID,
+    workspaceName: 'Support Inbox',
+    role: 'OWNER' as const,
+  }
+
+  it('returns 401 when there is no authenticated user', () => {
+    expect(getCallerMembershipDecision(null, [aliceSupportMembership])).toMatchObject({
+      isAuthorized: false,
+      statusCode: 401,
+      code: 'UNAUTHENTICATED',
+    })
+  })
+
+  it('returns 403 when the caller has no membership', () => {
+    expect(getCallerMembershipDecision(alice, [])).toMatchObject({
+      isAuthorized: false,
+      statusCode: 403,
+      code: 'FORBIDDEN',
+    })
+  })
+
+  it('returns 403 when more than one membership would force the server to pick a workspace', () => {
+    expect(
+      getCallerMembershipDecision(alice, [
+        aliceSupportMembership,
+        {
+          userId: alice.id,
+          workspaceId: BILLING_WORKSPACE_ID,
+          workspaceName: 'Billing Escalations',
+          role: 'OWNER',
+        },
+      ])
+    ).toMatchObject({
+      isAuthorized: false,
+      statusCode: 403,
+      code: 'FORBIDDEN',
+    })
+  })
+
+  it('returns the single membership for the caller', () => {
+    expect(
+      getCallerMembershipDecision(alice, [aliceSupportMembership])
+    ).toMatchObject({
+      isAuthorized: true,
+      membership: aliceSupportMembership,
+    })
+  })
+
+  it('ignores a membership that belongs to a different user', () => {
+    expect(
+      getCallerMembershipDecision(erin, [aliceSupportMembership])
+    ).toMatchObject({
+      isAuthorized: false,
+      statusCode: 403,
     })
   })
 })
