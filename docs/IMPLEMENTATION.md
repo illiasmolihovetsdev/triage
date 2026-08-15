@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through notification
-dispatch: resolve writes a `NotificationAttempt` and `after()` attempts
-delivery once. The queue row still shows `pending` from the 200 until refresh.
+Everything below reflects the state of the project through R3: resolve records
+an attempt, `after()` dispatches once, and the open queue row updates to `sent`
+or `failed` without a refresh.
 
 ## 1. Project structure
 
@@ -159,8 +159,8 @@ the first version of this script produced 10,000 identical statuses. The fix was
 
 Every protected item operation goes through `requireItemAction` in
 `src/lib/authz.ts`. Queue listing goes through `requireCallerMembership` in the
-same file. Claim, resolve, and release Route Handlers all call
-`requireItemAction` before they write.
+same file. Claim, resolve, release, and the single-item GET all call
+`requireItemAction` before they read or write.
 
 The check is:
 
@@ -353,6 +353,9 @@ resolve. A `FAILED` row is not retried.
   `PENDING`. An HTTP retry of resolve will schedule dispatch again because
   the row is still pending.
 
-The 200 body still says `notificationStatus: 'pending'`. The later `SENT` or
-`FAILED` is in the database; the open queue row does not refetch it yet. That
-is the next step. Until then, a refresh of `/queue` shows the stored outcome.
+The 200 body still says `notificationStatus: 'pending'`. After it returns, the
+queue polls `GET /api/items/[id]` (same `requireItemAction` read check, no
+store cache) until the attempt is `SENT` or `FAILED`, or five seconds pass.
+The open row then shows `sent` or `failed` without a page refresh. `failed` is
+red so it cannot read as a quiet success. If the poll times out, the cell
+stays `pending`, which is the truth if `after()` has not finished.

@@ -7,6 +7,14 @@ export const getClaimerLabel = (queueItem: QueueItem): string =>
 export const getNotificationLabel = (queueItem: QueueItem): string =>
   queueItem.notificationStatus ?? '—'
 
+export const getNotificationTextClassName = (queueItem: QueueItem): string =>
+  queueItem.notificationStatus === 'failed' ? 'text-red-700' : 'text-zinc-700'
+
+export const hasNotificationSettled = (
+  notificationStatus: QueueItem['notificationStatus']
+): boolean =>
+  notificationStatus === 'sent' || notificationStatus === 'failed'
+
 export const getQueueCountLabel = (
   shownCount: number,
   totalCount: number

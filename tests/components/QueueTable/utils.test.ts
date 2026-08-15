@@ -5,9 +5,11 @@ import {
   canShowReleaseButton,
   canShowResolveButton,
   getClaimButtonLabel,
+  getNotificationTextClassName,
   getReleaseButtonLabel,
   getResolveButtonLabel,
   getRowFeedbackMessage,
+  hasNotificationSettled,
   replaceQueueItem,
 } from '@/components/QueueTable/utils'
 import type { QueueItem } from '@/types/item'
@@ -128,5 +130,35 @@ describe('resolve and release button visibility', () => {
     expect(getReleaseButtonLabel({ kind: 'loading', action: 'release' })).toBe(
       'Releasing...'
     )
+  })
+})
+
+describe('notification visibility', () => {
+  it('treats sent and failed as settled, and pending as still in flight', () => {
+    expect(hasNotificationSettled('sent')).toBe(true)
+    expect(hasNotificationSettled('failed')).toBe(true)
+    expect(hasNotificationSettled('pending')).toBe(false)
+    expect(hasNotificationSettled(null)).toBe(false)
+  })
+
+  it('uses the error colour only for a failed notification', () => {
+    expect(
+      getNotificationTextClassName({
+        ...pendingItem,
+        notificationStatus: 'failed',
+      })
+    ).toBe('text-red-700')
+    expect(
+      getNotificationTextClassName({
+        ...pendingItem,
+        notificationStatus: 'sent',
+      })
+    ).toBe('text-zinc-700')
+    expect(
+      getNotificationTextClassName({
+        ...pendingItem,
+        notificationStatus: 'pending',
+      })
+    ).toBe('text-zinc-700')
   })
 })

@@ -91,3 +91,7 @@ export type FetchItemActionResult =
       item: QueueItem | null
     }
   | { isSuccess: false; errorMessage: string }
+
+export type FetchQueueItemResult =
+  | { isSuccess: true; item: QueueItem }
+  | { isSuccess: false; errorMessage: string }

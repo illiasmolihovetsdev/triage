@@ -9,6 +9,7 @@ import {
   getClaimButtonLabel,
   getClaimerLabel,
   getNotificationLabel,
+  getNotificationTextClassName,
   getReleaseButtonLabel,
   getResolveButtonLabel,
   getRowFeedbackMessage,
@@ -38,6 +39,8 @@ export const QueueRow = ({
   )
   const feedbackMessage = getRowFeedbackMessage(rowState)
   const isActionDisabled = rowState.kind === 'loading'
+  const notificationLabel = getNotificationLabel(queueItem)
+  const notificationTextClassName = getNotificationTextClassName(queueItem)
 
   const handleClaimClick = () => {
     onClaim(queueItem.id)
@@ -56,8 +59,8 @@ export const QueueRow = ({
       <td className="py-2 pr-4 text-zinc-900">{queueItem.title}</td>
       <td className="py-2 pr-4 text-zinc-700">{queueItem.status}</td>
       <td className="py-2 pr-4 text-zinc-700">{getClaimerLabel(queueItem)}</td>
-      <td className="py-2 pr-4 text-zinc-700">
-        {getNotificationLabel(queueItem)}
+      <td className={`py-2 pr-4 ${notificationTextClassName}`}>
+        {notificationLabel}
       </td>
       <td className="py-2 text-right">
         <div className="flex flex-wrap justify-end gap-1">

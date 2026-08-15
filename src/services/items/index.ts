@@ -1,7 +1,8 @@
 import 'server-only'
 
 import { prisma } from '@/lib/db'
-import { QUEUE_ITEM_SELECT, type QueuePageResult } from '@/services/items/types'
+import { fetchQueueItemRecord } from '@/services/items/records'
+import { QUEUE_ITEM_SELECT, type FetchQueueItemResult, type QueuePageResult } from '@/services/items/types'
 import { mapQueueItem } from '@/services/items/utils'
 import type { ItemAuthRecord } from '@/types/authz'
 import { QUEUE_PAGE_SIZE } from '@/types/item'
@@ -60,3 +61,25 @@ export const fetchQueuePage = async (
 export { claimItem, claimItemWithClient } from '@/services/items/claim'
 export { resolveItem, resolveItemWithClient } from '@/services/items/resolve'
 export { releaseItem, releaseItemWithClient } from '@/services/items/release'
+
+export const fetchQueueItemById = async (
+  itemId: string
+): Promise<FetchQueueItemResult> => {
+  try {
+    const itemRecord = await fetchQueueItemRecord(prisma, itemId)
+
+    if (!itemRecord) {
+      return {
+        isSuccess: false,
+        errorMessage: 'Item not found.',
+      }
+    }
+
+    return { isSuccess: true, item: mapQueueItem(itemRecord) }
+  } catch {
+    return {
+      isSuccess: false,
+      errorMessage: 'Could not load this item.',
+    }
+  }
+}
