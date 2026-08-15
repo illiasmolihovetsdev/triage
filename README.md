@@ -8,7 +8,7 @@ the same item at the same moment, what happens when someone calls the API with
 an item ID from a workspace they do not belong to, and what happens to a
 notification that fails after the response has already been sent.
 
-**Live URL:** not deployed yet.
+**Live URL:** [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app)
 
 ## Status
 
@@ -82,7 +82,7 @@ npm run verify:r1
 Against a deployment:
 
 ```bash
-VERIFY_BASE_URL=https://your-app.vercel.app npm run verify:r1
+VERIFY_BASE_URL=https://triage-seven-eta.vercel.app npm run verify:r1
 ```
 
 The script inserts a PENDING item, logs in as two members of that workspace,
@@ -122,7 +122,7 @@ npm run verify:r2
 Against a deployment:
 
 ```bash
-VERIFY_BASE_URL=https://your-app.vercel.app npm run verify:r2
+VERIFY_BASE_URL=https://triage-seven-eta.vercel.app npm run verify:r2
 ```
 
 The script inserts a pending Support item and a claimed one, then attacks them
@@ -178,6 +178,8 @@ curl -s -b carol.txt -X POST "$BASE/api/items/$CLAIMED_ID/resolve"
 
 ## Deploy
 
+Production is [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).
+
 The Prisma client is generated at build time (it is not in git). Vercel runs
 `vercel-build`, which is:
 
@@ -187,23 +189,14 @@ prisma generate && prisma migrate deploy && next build
 
 `migrate deploy` uses `DIRECT_URL` (port 5432). The app uses `DATABASE_URL`
 (pooled, port 6543). Seed is **not** part of deploy: `npm run seed` wipes
-tables, so it is a one-off against that database, locally, when the project is
-empty.
+tables, so it is a one-off against that database when the project is empty.
 
-Import [the GitHub repo](https://github.com/illiasmolihovetsdev/triage) in
-Vercel, or from this directory after `npx vercel login`:
+`AUTH_SECRET`, `DATABASE_URL`, and `DIRECT_URL` are set in the Vercel project.
+No paid add-ons. To ship another production build from this directory:
 
 ```bash
-npx vercel link
-npx vercel env add DATABASE_URL
-npx vercel env add DIRECT_URL
-npx vercel env add AUTH_SECRET
 npx vercel --prod
 ```
-
-Set the same three values as `.env`. No paid add-ons. After the first deploy,
-if the database is empty, run `npm run seed` once with `.env` pointed at that
-project.
 
 ## Checks
 

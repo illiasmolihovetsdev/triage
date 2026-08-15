@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through R3. Vercel build
-is configured to generate the Prisma client and apply migrations; a production
-URL is not live yet because the Vercel CLI is logged out.
+Everything below reflects the state of the project through R3. Production is
+[https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).
+Vercel builds generate the Prisma client and apply migrations.
 
 ## 1. Project structure
 
@@ -368,7 +368,5 @@ build`. Migrate uses `DIRECT_URL`; the running app uses `DATABASE_URL`. Seed
 is not on that path: `npm run seed` truncates and rebuilds, which must not run
 on every deploy.
 
-`AUTH_SECRET`, `DATABASE_URL`, and `DIRECT_URL` have to be set in the Vercel
-project. There is no live URL yet: the Vercel CLI on this machine is logged
-out, so production cannot be created from here until someone runs
-`npx vercel login` (or imports the GitHub repo in the Vercel dashboard).
+`AUTH_SECRET`, `DATABASE_URL`, and `DIRECT_URL` are set in the Vercel project.
+Production is [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).

@@ -18,7 +18,7 @@ import { SESSION_COOKIE_NAME } from '../src/lib/session'
  *   npm run verify:r1
  *
  * Against a deploy, point both the app and this script at the same database:
- *   VERIFY_BASE_URL=https://example.vercel.app npm run verify:r1
+ *   VERIFY_BASE_URL=https://triage-seven-eta.vercel.app npm run verify:r1
  */
 
 const SUPPORT_WORKSPACE_ID = 'ws_support'
