@@ -7,9 +7,10 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through resolve and release
-(R1 complete, R2 mutations in place). R3 notification on resolve is not
-implemented yet: a resolve currently changes item status only.
+Everything below reflects the state of the project through R2: claim, resolve,
+and release are authorized on the server, and `npm run verify:r2` attacks those
+routes over HTTP. R3 notification on resolve is not implemented yet: a resolve
+currently changes item status only.
 
 ## 1. Project structure
 
@@ -186,6 +187,20 @@ is not here" would leak existence to anyone who can paste an ID into curl.
 The UI hides claim, resolve, and release using `canRolePerformAction` plus,
 for resolve and release, a check that the current user is the claimer. That is
 display only. Curl still has to pass through `requireItemAction`.
+
+A reviewer can run the same attacks without using the UI:
+
+```bash
+npm run verify:r2
+```
+
+That script is `scripts/verify-r2.ts`. It creates a pending Support item and a
+claimed one, then calls the mutation routes with no cookie, as a viewer, as a
+Billing owner, and as a Support member who does not hold the claim. It also
+compares the Billing owner's 404 body to a missing id, so a stolen Support ID
+cannot confirm that the row exists. `npm test` still covers the matrix as a
+pure function; `verify:r2` is the proof that the Route Handlers did not skip
+the check.
 
 ## 7. Queue listing
 

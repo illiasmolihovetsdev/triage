@@ -24,7 +24,7 @@ today, not what is planned.
 | Atomic claim endpoint (R1 server) | Done |
 | Claim UI reconciliation (R1) | Done |
 | R1 — exactly one winner per claim | Done (`npm run verify:r1`) |
-| R2 — workspace isolation and roles | Not started |
+| R2 — workspace isolation and roles | Done (`npm run verify:r2`) |
 | R3 — resolve and notify | Not started |
 | R4, R5 (optional) | Not planned in this iteration |
 
@@ -104,6 +104,76 @@ Database: one CLAIMED row, same holder.
 R1 passed.
 ```
 
+## Verifying R2
+
+The check lives in `requireItemAction` (`src/lib/authz.ts`), which every item
+mutation calls before it writes. Workspace comes from the item row, never from
+the client. Hidden buttons are not the boundary.
+
+The app must be running, on the same database as `.env`.
+
+```bash
+npm run dev          # another terminal, or npm run start after a build
+npm run verify:r2
+```
+
+Against a deployment:
+
+```bash
+VERIFY_BASE_URL=https://your-app.vercel.app npm run verify:r2
+```
+
+The script inserts a pending Support item and a claimed one, then attacks them
+over HTTP. It passes only if:
+
+- no cookie → **401** `UNAUTHENTICATED`
+- Dave (viewer) → **403** `FORBIDDEN` on claim, resolve, and release
+- Erin (Billing owner) → **404** `NOT_FOUND` on those Support items, with the
+  same body as a missing id (existence does not leak)
+- Carol (member) and Alice (owner) → **403** `NOT_CLAIMER` on Bob's claim
+- the attacked rows are unchanged afterwards
+- Dave's queue HTML contains the Support title; Erin's does not
+- unauthenticated `GET /queue` is **307**
+
+It then deletes the items it created.
+
+### Curl recipes
+
+The queue does not show item ids. Copy one from a claim request in the
+browser network tab (`/api/items/<id>/claim`), or skip the recipes and run
+`npm run verify:r2`, which performs the same attacks on rows it creates.
+`CLAIMED_ID` must be an item Bob currently holds.
+
+```bash
+BASE=http://localhost:3000
+ITEM_ID=replace-with-a-support-item-id
+CLAIMED_ID=replace-with-bob-claimed-item-id
+
+# No cookie → 401
+curl -s -X POST "$BASE/api/items/$ITEM_ID/claim"
+
+# Dave, viewer in Support → 403
+curl -s -c dave.txt -X POST "$BASE/api/auth/login" \
+  -H 'content-type: application/json' \
+  -d '{"userId":"user_dave"}'
+curl -s -b dave.txt -X POST "$BASE/api/items/$ITEM_ID/claim"
+curl -s -b dave.txt -X POST "$BASE/api/items/$CLAIMED_ID/resolve"
+curl -s -b dave.txt -X POST "$BASE/api/items/$CLAIMED_ID/release"
+
+# Erin, owner in Billing → 404, identical to a missing id
+curl -s -c erin.txt -X POST "$BASE/api/auth/login" \
+  -H 'content-type: application/json' \
+  -d '{"userId":"user_erin"}'
+curl -s -b erin.txt -X POST "$BASE/api/items/$ITEM_ID/claim"
+curl -s -b erin.txt -X POST "$BASE/api/items/item_r2_does_not_exist/claim"
+
+# Carol does not hold CLAIMED_ID → 403 NOT_CLAIMER
+curl -s -c carol.txt -X POST "$BASE/api/auth/login" \
+  -H 'content-type: application/json' \
+  -d '{"userId":"user_carol"}'
+curl -s -b carol.txt -X POST "$BASE/api/items/$CLAIMED_ID/resolve"
+```
+
 ## Checks
 
 ```bash
@@ -112,6 +182,7 @@ npm run lint        # eslint
 npm run test        # vitest
 npm run build       # production build
 npm run verify:r1   # two concurrent HTTP claims; app must be running
+npm run verify:r2   # workspace isolation and roles over HTTP; app must be running
 ```
 
 ## Documentation

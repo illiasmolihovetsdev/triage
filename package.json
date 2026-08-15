@@ -14,7 +14,8 @@
     "seed": "tsx prisma/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:r1": "tsx scripts/verify-r1.ts"
+    "verify:r1": "tsx scripts/verify-r1.ts",
+    "verify:r2": "tsx scripts/verify-r2.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
