@@ -9,6 +9,7 @@ export const mapQueueItem = (itemRecord: QueueItemRecord): QueueItem => ({
   id: itemRecord.id,
   title: itemRecord.title,
   status: itemRecord.status.toLowerCase() as QueueItemStatus,
+  claimerId: itemRecord.claimedBy?.id ?? null,
   claimerName: itemRecord.claimedBy?.name ?? null,
   notificationStatus: itemRecord.notificationAttempt
     ? (itemRecord.notificationAttempt.status.toLowerCase() as QueueNotificationStatus)

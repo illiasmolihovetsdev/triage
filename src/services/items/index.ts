@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { prisma } from '@/lib/db'
-import type { QueuePageResult } from '@/services/items/types'
+import { QUEUE_ITEM_SELECT, type QueuePageResult } from '@/services/items/types'
 import { mapQueueItem } from '@/services/items/utils'
 import type { ItemAuthRecord } from '@/types/authz'
 import { QUEUE_PAGE_SIZE } from '@/types/item'
@@ -35,13 +35,7 @@ export const fetchQueuePage = async (
         where: { workspaceId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: QUEUE_PAGE_SIZE,
-        select: {
-          id: true,
-          title: true,
-          status: true,
-          claimedBy: { select: { name: true } },
-          notificationAttempt: { select: { status: true } },
-        },
+        select: QUEUE_ITEM_SELECT,
       }),
       prisma.item.count({ where: { workspaceId } }),
     ])
@@ -62,3 +56,5 @@ export const fetchQueuePage = async (
     }
   }
 }
+
+export { claimItem, claimItemWithClient } from '@/services/items/claim'

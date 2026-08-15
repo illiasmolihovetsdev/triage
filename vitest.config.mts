@@ -11,10 +11,12 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     passWithNoTests: true,
+    setupFiles: [fileURLToPath(new URL('./vitest.setup.ts', import.meta.url))],
   },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      'server-only': fileURLToPath(new URL('./vitest.server-only.ts', import.meta.url)),
     },
   },
 })

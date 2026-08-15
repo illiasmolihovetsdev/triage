@@ -192,6 +192,9 @@ Record these decisions in `DECISIONS.md`.
 
 ## 8. R1 — Concurrent claiming
 
+Implemented on the server. See `IMPLEMENTATION.md` section 8. The queue UI does
+not yet reconcile a lost claim.
+
 ### Requirement
 
 Two members may attempt to claim the same item simultaneously.
@@ -568,10 +571,11 @@ Settled so far:
 - authorization placement — `requireItemAction` in `src/lib/authz.ts`; workspace
   derived from the item row; cross-workspace access is 404; role failure is 403;
   only the current claimer may resolve or release
+- claim concurrency — one `updateMany` with `status: 'PENDING'`; loser is 409
+  with the current holder; self-claim is idempotent 200
 
 Still open, to finalize during implementation:
 
-- claim concurrency strategy
 - notification delivery model
 - notification guarantee
 - pagination strategy if R4 is implemented

@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through the read-only queue.
-Item mutations, R1, R2 write routes, and R3 are not implemented yet and are
-therefore absent here rather than described optimistically.
+Everything below reflects the state of the project through the atomic claim
+endpoint. The queue UI does not yet claim, so R1 is not finished. Resolve,
+release, and R3 are not implemented yet.
 
 ## 1. Project structure
 
@@ -200,3 +200,32 @@ Unauthenticated visits redirect to `/` from the queue layout, before
 navigates to `/`. A viewer sees the same table as a member; there are no
 action buttons yet, so the role difference is not visible in the UI.
 Isolation is: Alice's queue titles start with `Support`, Erin's with `Billing`.
+
+## 8. Concurrent claiming
+
+`POST /api/items/[id]/claim` is the first item mutation. It calls
+`requireItemAction(itemId, 'claim')` and only then runs one conditional update:
+
+```sql
+UPDATE "Item"
+SET status = 'CLAIMED', "claimedById" = $userId, "claimedAt" = now()
+WHERE id = $itemId AND status = 'PENDING'
+```
+
+Prisma `updateMany` with `where: { id, status: 'PENDING' }` compiles to that
+statement. PostgreSQL locks the row, evaluates `WHERE`, and applies at most one
+of the concurrent updates. That is the R1 guarantee — not an application-level
+`if` after a read.
+
+The loser matches zero rows, reads who holds the item now, and receives **409**
+`CLAIM_CONFLICT` with `{ claimedBy: { id, name } }`. The follow-up read is not
+the winning snapshot: if the winner has already released and someone else
+claimed, the 409 names the current holder, which is what the UI needs.
+
+If the caller already holds the claim, the response is **200**. A lost winner
+response can be retried without turning into a conflict against yourself.
+
+Viewers never reach the `UPDATE` (**403**). A user from another workspace gets
+the same **404** as an unknown item. Unauthenticated requests get **401**.
+
+The queue table still has no claim button. This step is the server contract.

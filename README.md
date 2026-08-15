@@ -21,7 +21,8 @@ today, not what is planned.
 | Authentication (seeded users, signed cookie) | Done |
 | Authorization module (item → workspace → role) | Done |
 | Workspace-scoped queue view | Done |
-| R1 — exactly one winner per claim | Not started |
+| Atomic claim endpoint (R1 server) | Done |
+| R1 — exactly one winner per claim | Server done, UI not started |
 | R2 — workspace isolation and roles | Not started |
 | R3 — resolve and notify | Not started |
 | R4, R5 (optional) | Not planned in this iteration |

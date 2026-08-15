@@ -1,13 +1,21 @@
 import type { ItemStatus, NotificationStatus } from '@/generated/prisma/enums'
-import type { QueueItem } from '@/types/item'
+import type { ClaimHolder, QueueItem } from '@/types/item'
 
 export interface QueueItemRecord {
   id: string
   title: string
   status: ItemStatus
-  claimedBy: { name: string } | null
+  claimedBy: { id: string; name: string } | null
   notificationAttempt: { status: NotificationStatus } | null
 }
+
+export const QUEUE_ITEM_SELECT = {
+  id: true,
+  title: true,
+  status: true,
+  claimedBy: { select: { id: true, name: true } },
+  notificationAttempt: { select: { status: true } },
+} as const
 
 export type QueuePageResult =
   | {
@@ -18,3 +26,19 @@ export type QueuePageResult =
       pageSize: number
     }
   | { isSuccess: false; errorMessage: string }
+
+export type ClaimItemResult =
+  | { isSuccess: true; item: QueueItem }
+  | {
+      isSuccess: false
+      statusCode: 409
+      code: 'CLAIM_CONFLICT'
+      message: string
+      claimedBy: ClaimHolder | null
+    }
+  | {
+      isSuccess: false
+      statusCode: 404
+      code: 'NOT_FOUND'
+      message: string
+    }
