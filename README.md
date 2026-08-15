@@ -25,7 +25,7 @@ today, not what is planned.
 | Claim UI reconciliation (R1) | Done |
 | R1 — exactly one winner per claim | Done (`npm run verify:r1`) |
 | R2 — workspace isolation and roles | Done (`npm run verify:r2`) |
-| R3 — resolve and notify | Not started |
+| R3 — resolve and notify | Attempt recorded on resolve; delivery not dispatched yet |
 | R4, R5 (optional) | Not planned in this iteration |
 
 ## Setup

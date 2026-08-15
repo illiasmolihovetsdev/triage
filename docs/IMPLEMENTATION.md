@@ -7,10 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through R2: claim, resolve,
-and release are authorized on the server, and `npm run verify:r2` attacks those
-routes over HTTP. R3 notification on resolve is not implemented yet: a resolve
-currently changes item status only.
+Everything below reflects the state of the project through the start of R3:
+resolve writes a `NotificationAttempt` in the same transaction as the status
+change. Delivery is not attempted yet: `notify()` exists but is not scheduled.
 
 ## 1. Project structure
 
@@ -307,6 +306,25 @@ response cannot: after release the item is `PENDING` with no claimer, so
 authorization returns 403 `NOT_CLAIMER`. That is honest rather than pretending
 the retry still holds the claim.
 
-These routes do not send a notification. R3 will insert `NotificationAttempt`
-in the same transaction as resolve and dispatch after the response. Until then
-a resolve is only a status change.
+These routes do not wait for `notify()`. Resolve and the attempt row are one
+transaction:
+
+1. `UPDATE` the item to `RESOLVED` where it is still `CLAIMED` by this caller.
+2. `INSERT` a `NotificationAttempt` with status `PENDING`.
+3. Commit. The 200 body includes `notificationStatus: 'pending'`.
+
+If the insert fails, the status change rolls back: there is never a resolved
+item without an attempt row, and never an attempt row for an item that is still
+claimed. `itemId` is unique, so a retry after a lost 200 does not insert a
+second row; the idempotent path sees `RESOLVED` and returns 200 with the
+existing attempt.
+
+`notify()` lives in `src/lib/notify.ts`. It sleeps about one second and throws
+on roughly one call in five. It is not retried and is not awaited on this
+path. Scheduling it with `after()` is the next step. Until then every new
+resolve leaves a `PENDING` attempt, which is visible in the queue's
+notification column as `pending` rather than silent.
+
+The guarantee this will provide, once dispatch is wired, is
+**best-effort-with-a-record**. What is actually guaranteed today is the record:
+a resolve cannot persist without an attempt row. Delivery is not attempted.

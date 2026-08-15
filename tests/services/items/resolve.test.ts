@@ -72,6 +72,7 @@ describe('resolveItemWithClient', () => {
     if (resolveResult.isSuccess) {
       expect(resolveResult.item.status).toBe('resolved')
       expect(resolveResult.item.claimerId).toBe(BOB_USER_ID)
+      expect(resolveResult.item.notificationStatus).toBe('pending')
     }
 
     const storedItem = await setupClient.item.findUnique({
@@ -82,6 +83,17 @@ describe('resolveItemWithClient', () => {
     expect(storedItem?.status).toBe('RESOLVED')
     expect(storedItem?.claimedById).toBe(BOB_USER_ID)
     expect(storedItem?.resolvedAt).not.toBeNull()
+
+    const attemptRecord = await setupClient.notificationAttempt.findUnique({
+      where: { itemId },
+      select: { status: true, error: true, finishedAt: true },
+    })
+
+    expect(attemptRecord).toEqual({
+      status: 'PENDING',
+      error: null,
+      finishedAt: null,
+    })
   })
 
   it('returns success when the caller already resolved the item', async () => {
@@ -107,7 +119,14 @@ describe('resolveItemWithClient', () => {
     if (retryResolveResult.isSuccess) {
       expect(retryResolveResult.item.status).toBe('resolved')
       expect(retryResolveResult.item.claimerId).toBe(BOB_USER_ID)
+      expect(retryResolveResult.item.notificationStatus).toBe('pending')
     }
+
+    const attemptCount = await setupClient.notificationAttempt.count({
+      where: { itemId },
+    })
+
+    expect(attemptCount).toBe(1)
   })
 
   it('rejects a resolve from someone who does not hold the claim', async () => {
@@ -139,6 +158,12 @@ describe('resolveItemWithClient', () => {
       claimedById: BOB_USER_ID,
       resolvedAt: null,
     })
+
+    const attemptCount = await setupClient.notificationAttempt.count({
+      where: { itemId },
+    })
+
+    expect(attemptCount).toBe(0)
   })
 
   it('rejects a resolve on a pending item', async () => {
@@ -164,5 +189,11 @@ describe('resolveItemWithClient', () => {
       code: 'RESOLVE_CONFLICT',
       message: 'This item is no longer claimed.',
     })
+
+    const attemptCount = await setupClient.notificationAttempt.count({
+      where: { itemId: itemRecord.id },
+    })
+
+    expect(attemptCount).toBe(0)
   })
 })

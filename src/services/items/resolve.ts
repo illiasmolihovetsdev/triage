@@ -13,8 +13,10 @@ import type { ClaimHolder } from '@/types/item'
  * repeats that in WHERE so a missed check still cannot resolve someone else's
  * row, or a row that is no longer CLAIMED.
  *
- * Notification is not part of this write. R3 records the attempt in the same
- * transaction as resolve; until then a resolve is a status change only.
+ * The NotificationAttempt insert is in the same transaction as the UPDATE.
+ * Either the item is RESOLVED and has exactly one PENDING attempt, or neither
+ * write landed. Delivery is not attempted here: notify() is not awaited on
+ * this path, and after() is the next step.
  */
 const getResolveConflictMessage = (
   status: ItemStatus,
@@ -45,15 +47,30 @@ export const resolveItemWithClient = async (
   itemId: string,
   userId: string
 ): Promise<ResolveItemResult> => {
-  const updateResult = await database.item.updateMany({
-    where: { id: itemId, status: 'CLAIMED', claimedById: userId },
-    data: {
-      status: 'RESOLVED',
-      resolvedAt: new Date(),
-    },
+  const didResolve = await database.$transaction(async (transaction) => {
+    const updateResult = await transaction.item.updateMany({
+      where: { id: itemId, status: 'CLAIMED', claimedById: userId },
+      data: {
+        status: 'RESOLVED',
+        resolvedAt: new Date(),
+      },
+    })
+
+    if (updateResult.count !== 1) {
+      return false
+    }
+
+    await transaction.notificationAttempt.create({
+      data: {
+        itemId,
+        status: 'PENDING',
+      },
+    })
+
+    return true
   })
 
-  if (updateResult.count === 1) {
+  if (didResolve) {
     const resolvedItemRecord = await fetchQueueItemRecord(database, itemId)
 
     if (!resolvedItemRecord) {
