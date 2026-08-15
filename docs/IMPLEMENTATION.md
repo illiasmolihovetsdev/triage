@@ -234,3 +234,15 @@ of the rows. A 200 replaces that row with the returned item. A 409 patches
 status and claimer from `claimedBy` and shows "Already claimed by …" on that
 row. There is no optimistic claim: the button stays on Claiming... until the
 server answers, so the table cannot show a holder the database rejected.
+
+A reviewer can run the same race over HTTP without using the UI:
+
+```bash
+npm run verify:r1
+```
+
+That script is `scripts/verify-r1.ts`. It creates a PENDING item, logs in as
+two members, fires both claims at once, checks the 200/409 pair against the
+database row, and deletes the item. `npm test` still covers the UPDATE itself;
+`verify:r1` is the assignment's runnable proof that the Route Handler does not
+undo it.

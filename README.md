@@ -23,7 +23,7 @@ today, not what is planned.
 | Workspace-scoped queue view | Done |
 | Atomic claim endpoint (R1 server) | Done |
 | Claim UI reconciliation (R1) | Done |
-| R1 — exactly one winner per claim | UI done; HTTP verify script not started |
+| R1 — exactly one winner per claim | Done (`npm run verify:r1`) |
 | R2 — workspace isolation and roles | Not started |
 | R3 — resolve and notify | Not started |
 | R4, R5 (optional) | Not planned in this iteration |
@@ -69,13 +69,40 @@ as any of them from the home page.
 
 ## Verifying R1
 
-Not implemented yet.
+The app must be running, and `.env` must point at the same database that app
+uses.
 
-When claiming exists, this section will describe a single command that fires two
-genuinely concurrent claim requests at the same item and asserts that exactly one
-wins, that the loser is told who holds the claim, and that the database ends in
-one claimed state. Until that command exists and passes, nothing here should be
-read as a guarantee.
+```bash
+npm run dev          # another terminal, or npm run start after a build
+npm run verify:r1
+```
+
+Against a deployment:
+
+```bash
+VERIFY_BASE_URL=https://your-app.vercel.app npm run verify:r1
+```
+
+The script inserts a PENDING item, logs in as two members of that workspace,
+and fires both claim requests at once. It passes only if:
+
+- exactly one request returns 200
+- the other returns 409 `CLAIM_CONFLICT`
+- the 409 names the winner
+- the database row is `CLAIMED` by that same user
+
+It then deletes the item it created. A pass looks like:
+
+```
+Target: http://localhost:3000
+Item: …
+Bob: HTTP 200
+Carol: HTTP 409
+Winner: Bob (Bob Marsh)
+Loser told: Already claimed by Bob Marsh.
+Database: one CLAIMED row, same holder.
+R1 passed.
+```
 
 ## Checks
 
@@ -84,6 +111,7 @@ npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm run test        # vitest
 npm run build       # production build
+npm run verify:r1   # two concurrent HTTP claims; app must be running
 ```
 
 ## Documentation
