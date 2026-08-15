@@ -15,8 +15,8 @@ import type { ClaimHolder } from '@/types/item'
  *
  * The NotificationAttempt insert is in the same transaction as the UPDATE.
  * Either the item is RESOLVED and has exactly one PENDING attempt, or neither
- * write landed. Delivery is not attempted here: notify() is not awaited on
- * this path, and after() is the next step.
+ * write landed. notify() is not awaited here. The Route Handler schedules
+ * delivery with after() after it returns the 200.
  */
 const getResolveConflictMessage = (
   status: ItemStatus,

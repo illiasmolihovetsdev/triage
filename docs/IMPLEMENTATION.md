@@ -7,9 +7,9 @@ questions. This document is the opposite: it describes only what is implemented
 and verified. If the two disagree, this one is right, and the architecture
 document needs updating.
 
-Everything below reflects the state of the project through the start of R3:
-resolve writes a `NotificationAttempt` in the same transaction as the status
-change. Delivery is not attempted yet: `notify()` exists but is not scheduled.
+Everything below reflects the state of the project through notification
+dispatch: resolve writes a `NotificationAttempt` and `after()` attempts
+delivery once. The queue row still shows `pending` from the 200 until refresh.
 
 ## 1. Project structure
 
@@ -320,11 +320,39 @@ second row; the idempotent path sees `RESOLVED` and returns 200 with the
 existing attempt.
 
 `notify()` lives in `src/lib/notify.ts`. It sleeps about one second and throws
-on roughly one call in five. It is not retried and is not awaited on this
-path. Scheduling it with `after()` is the next step. Until then every new
-resolve leaves a `PENDING` attempt, which is visible in the queue's
-notification column as `pending` rather than silent.
+on roughly one call in five. It is not retried and is not awaited on the
+resolve path.
 
-The guarantee this will provide, once dispatch is wired, is
-**best-effort-with-a-record**. What is actually guaranteed today is the record:
-a resolve cannot persist without an attempt row. Delivery is not attempted.
+## 10. Notification dispatch
+
+After the 200 is sent, `after()` from `next/server` runs
+`dispatchNotificationAttempt`. That is the platform `waitUntil` path: the
+invocation stays alive long enough to *attempt* delivery. A bare unawaited
+Promise after the response would not.
+
+Dispatch reads the attempt row. If it is not still `PENDING`, it returns
+without calling `notify()` — so an idempotent resolve retry does not send a
+second time after `SENT` or `FAILED`. If it is `PENDING`:
+
+1. Call `notify()` once.
+2. On success, set the attempt to `SENT` with `finishedAt`.
+3. On throw, set it to `FAILED` with `finishedAt` and the error message.
+
+The item stays `RESOLVED` in every case. Notification failure cannot undo
+resolve. A `FAILED` row is not retried.
+
+**Actual guarantee: `best-effort-with-a-record`.**
+
+- Resolve does not wait on `notify()`.
+- We attempt delivery once after the response.
+- We do not claim at-least-once (no retry of `FAILED`) or at-most-once without
+  a record.
+- If `notify()` succeeds and the status update fails, the row can remain
+  `PENDING` after a delivery that happened. The record is best-effort too.
+- If the function is killed before `after()` finishes, the row stays
+  `PENDING`. An HTTP retry of resolve will schedule dispatch again because
+  the row is still pending.
+
+The 200 body still says `notificationStatus: 'pending'`. The later `SENT` or
+`FAILED` is in the database; the open queue row does not refetch it yet. That
+is the next step. Until then, a refresh of `/queue` shows the stored outcome.
