@@ -53,9 +53,11 @@ Both URLs arrive containing a `[YOUR-PASSWORD]` placeholder. Replace the whole
 thing, square brackets included, with your database password. Leaving the
 brackets in produces an authentication failure that reads like a wrong password.
 
-Then create the schema, load the data, and start the app:
+Then create the schema, generate the Prisma client, load the data, and start
+the app:
 
 ```bash
+npx prisma generate
 npx prisma migrate deploy
 npm run seed
 npm run dev
@@ -173,6 +175,35 @@ curl -s -c carol.txt -X POST "$BASE/api/auth/login" \
   -d '{"userId":"user_carol"}'
 curl -s -b carol.txt -X POST "$BASE/api/items/$CLAIMED_ID/resolve"
 ```
+
+## Deploy
+
+The Prisma client is generated at build time (it is not in git). Vercel runs
+`vercel-build`, which is:
+
+```bash
+prisma generate && prisma migrate deploy && next build
+```
+
+`migrate deploy` uses `DIRECT_URL` (port 5432). The app uses `DATABASE_URL`
+(pooled, port 6543). Seed is **not** part of deploy: `npm run seed` wipes
+tables, so it is a one-off against that database, locally, when the project is
+empty.
+
+Import [the GitHub repo](https://github.com/illiasmolihovetsdev/triage) in
+Vercel, or from this directory after `npx vercel login`:
+
+```bash
+npx vercel link
+npx vercel env add DATABASE_URL
+npx vercel env add DIRECT_URL
+npx vercel env add AUTH_SECRET
+npx vercel --prod
+```
+
+Set the same three values as `.env`. No paid add-ons. After the first deploy,
+if the database is empty, run `npm run seed` once with `.env` pointed at that
+project.
 
 ## Checks
 
