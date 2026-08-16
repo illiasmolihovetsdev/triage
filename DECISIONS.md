@@ -123,15 +123,12 @@ attach it, the inline `notify()` is not.
 
 ## Deliberately not done
 
-**R4 — stable pagination.** The queue loads at most 50 rows, newest
-first. That is a cap so 10,000 rows never hit the response. It is not
-pagination: there is no next page. Approach if we built it: keyset on
-`(createdAt DESC, id DESC)` with index `(workspaceId, createdAt DESC, id
-DESC)`, not `OFFSET`. Failure mode: a row that is claimed or resolved
-while you page can disappear from a later page; you will not see a
-stable snapshot of the whole queue. Offset would skip and repeat more
-as the list mutates, and deep pages get linearly more expensive, which
-is what `EXPLAIN ANALYZE` would show.
+**R4 — stable pagination.** The queue is keyset-paginated on
+`(createdAt DESC, id DESC)`, 50 rows per page, cursor in `?cursor=`. That
+is not OFFSET: a claim on an earlier row does not shift later pages.
+Failure mode: not a snapshot; new rows appear on page 1 only. Status
+filter and the EXPLAIN ANALYZE comparison with OFFSET are the next R4
+step.
 
 **R5 — expiring claims.** Nothing sweeps stale claims. Approach if we
 built it: no daemon. Fold expiry into the same claim `UPDATE` (`status =

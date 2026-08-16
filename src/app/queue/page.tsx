@@ -2,11 +2,15 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { CurrentUserBar } from '@/components/CurrentUserBar'
 import { QueueTable } from '@/components/QueueTable'
+import { getTotalPageCount } from '@/components/QueueTable/QueuePagination/utils'
 import { requireCallerMembership } from '@/lib/authz'
 import { fetchQueuePage } from '@/services/items'
 import { canRolePerformAction } from '@/utils/authorization'
+import { getCurrentQueuePage, getQueryStringValue } from './utils'
 
-export default async function QueuePage() {
+export default async function QueuePage({
+  searchParams,
+}: PageProps<'/queue'>) {
   const callerMembershipResult = await requireCallerMembership()
 
   if (!callerMembershipResult.isAuthorized) {
@@ -31,12 +35,24 @@ export default async function QueuePage() {
     )
   }
 
+  const resolvedSearchParams = await searchParams
+  const cursorToken = getQueryStringValue(resolvedSearchParams.cursor)
+  const beforeToken = getQueryStringValue(resolvedSearchParams.before)
+  const currentPage = getCurrentQueuePage(
+    cursorToken,
+    beforeToken,
+    resolvedSearchParams.page
+  )
   const { user, membership } = callerMembershipResult
-  const queuePageResult = await fetchQueuePage(membership.workspaceId)
+  const queuePageResult = await fetchQueuePage(membership.workspaceId, {
+    cursorToken,
+    beforeToken,
+  })
   const membershipLabel = `${membership.workspaceName} · ${membership.role.toLowerCase()}`
   const canClaim = canRolePerformAction(membership.role, 'claim')
   const canResolve = canRolePerformAction(membership.role, 'resolve')
   const canRelease = canRolePerformAction(membership.role, 'release')
+  const tableKey = cursorToken ?? beforeToken ?? 'first'
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -62,6 +78,7 @@ export default async function QueuePage() {
 
       {queuePageResult.isSuccess ? (
         <QueueTable
+          key={tableKey}
           itemList={queuePageResult.itemList}
           shownCount={queuePageResult.shownCount}
           totalCount={queuePageResult.totalCount}
@@ -69,6 +86,15 @@ export default async function QueuePage() {
           canClaim={canClaim}
           canResolve={canResolve}
           canRelease={canRelease}
+          pagination={{
+            currentPage,
+            totalPages: getTotalPageCount(
+              queuePageResult.totalCount,
+              queuePageResult.pageSize
+            ),
+            nextCursor: queuePageResult.nextCursor,
+            prevCursor: queuePageResult.prevCursor,
+          }}
         />
       ) : (
         <p

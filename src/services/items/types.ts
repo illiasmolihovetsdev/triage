@@ -5,6 +5,7 @@ export interface QueueItemRecord {
   id: string
   title: string
   status: ItemStatus
+  createdAt: Date
   claimedBy: { id: string; name: string } | null
   notificationAttempt: { status: NotificationStatus } | null
 }
@@ -13,9 +14,16 @@ export const QUEUE_ITEM_SELECT = {
   id: true,
   title: true,
   status: true,
+  createdAt: true,
   claimedBy: { select: { id: true, name: true } },
   notificationAttempt: { select: { status: true } },
 } as const
+
+export interface FetchQueuePageOptions {
+  cursorToken?: string
+  beforeToken?: string
+  pageSize?: number
+}
 
 export type QueuePageResult =
   | {
@@ -24,6 +32,10 @@ export type QueuePageResult =
       shownCount: number
       totalCount: number
       pageSize: number
+      nextCursor: string | null
+      prevCursor: string | null
+      hasNextPage: boolean
+      hasPreviousPage: boolean
     }
   | { isSuccess: false; errorMessage: string }
 

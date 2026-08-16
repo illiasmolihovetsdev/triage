@@ -1,3 +1,4 @@
+import type { QueuePaginationProps } from '@/components/QueueTable/QueuePagination/types'
 import type { QueueItem } from '@/types/item'
 
 export interface QueueTableProps {
@@ -8,6 +9,7 @@ export interface QueueTableProps {
   canClaim: boolean
   canResolve: boolean
   canRelease: boolean
+  pagination: QueuePaginationProps
 }
 
 export type QueueRowAction = 'claim' | 'resolve' | 'release'

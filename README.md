@@ -26,7 +26,8 @@ today, not what is planned.
 | R1 — exactly one winner per claim | Done (`npm run verify:r1`) |
 | R2 — workspace isolation and roles | Done (`npm run verify:r2`) |
 | R3 — resolve and notify | Done (sent/failed appear on the open row) |
-| R4, R5 (optional) | Skipped; approach in `DECISIONS.md` |
+| R4 — stable pagination | In progress: keyset paging (this step). Status filter and EXPLAIN ANALYZE next. |
+| R5 (optional) | Not started; approach in `DECISIONS.md` |
 
 ## Setup
 

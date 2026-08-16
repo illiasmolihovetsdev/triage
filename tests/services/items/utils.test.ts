@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { mapQueueItem } from '@/services/items/utils'
 
+const mappedCreatedAt = new Date('2026-01-01T00:00:00.000Z')
+
 describe('mapQueueItem', () => {
   it('maps a claimed item without a notification', () => {
     expect(
@@ -8,6 +10,7 @@ describe('mapQueueItem', () => {
         id: 'item_1',
         title: 'Support #1 — Password reset request',
         status: 'CLAIMED',
+        createdAt: mappedCreatedAt,
         claimedBy: { id: 'user_bob', name: 'Bob Marsh' },
         notificationAttempt: null,
       })
@@ -27,6 +30,7 @@ describe('mapQueueItem', () => {
         id: 'item_2',
         title: 'Billing #4 — Duplicate charge reported',
         status: 'RESOLVED',
+        createdAt: mappedCreatedAt,
         claimedBy: { id: 'user_erin', name: 'Erin Walsh' },
         notificationAttempt: { status: 'FAILED' },
       })
@@ -46,6 +50,7 @@ describe('mapQueueItem', () => {
         id: 'item_3',
         title: 'Support #9 — Export job stuck',
         status: 'PENDING',
+        createdAt: mappedCreatedAt,
         claimedBy: null,
         notificationAttempt: null,
       })

@@ -88,8 +88,9 @@ model Item {
   claimedBy           User?                @relation("ItemClaimedBy", fields: [claimedById], references: [id], onDelete: Restrict)
   notificationAttempt NotificationAttempt?
 
-  // Queue listing: always scoped to one workspace, usually filtered by status,
-  // ordered by recency.
+  // Unfiltered queue keyset: workspace, then recency, id as the tiebreaker.
+  @@index([workspaceId, createdAt(sort: Desc), id(sort: Desc)])
+  // Filtered queue listing: workspace, status, then recency.
   @@index([workspaceId, status, createdAt])
   // "What am I currently holding?"
   @@index([claimedById])

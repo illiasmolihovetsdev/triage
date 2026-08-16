@@ -1,5 +1,6 @@
 'use client'
 
+import { QueuePagination } from '@/components/QueueTable/QueuePagination'
 import { QueueRow } from '@/components/QueueTable/QueueRow'
 import { useQueueActions } from '@/components/QueueTable/hooks'
 import type { QueueTableProps } from '@/components/QueueTable/types'
@@ -13,6 +14,7 @@ export const QueueTable = ({
   canClaim,
   canResolve,
   canRelease,
+  pagination,
 }: QueueTableProps) => {
   const {
     itemList,
@@ -36,6 +38,7 @@ export const QueueTable = ({
       <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
         {countLabel}
       </h2>
+      <QueuePagination {...pagination} />
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-zinc-300 text-left text-xs uppercase tracking-wide text-zinc-500">

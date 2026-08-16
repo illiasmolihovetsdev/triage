@@ -2,15 +2,16 @@
 
 ## Status
 
-This document is the design rationale for what shipped: R1, R2, and R3 on
-Next.js App Router, Prisma, Supabase Postgres, and Vercel.
+This document is the design rationale for what shipped: R1, R2, R3, and
+keyset pagination for the queue (R4 in progress) on Next.js App Router,
+Prisma, Supabase Postgres, and Vercel.
 
 `IMPLEMENTATION.md` is the description of the running system. `DECISIONS.md`
 is the trade-off record. Where those two disagree with this file, they are
 right.
 
-R4 (stable pagination) and R5 (expiring claims) were not implemented. The
-intended approaches are in `DECISIONS.md`.
+R4 status-filter and EXPLAIN ANALYZE are not in yet. R5 (expiring claims)
+is not implemented. The remaining approaches are in `DECISIONS.md`.
 
 ## 1. System overview
 
@@ -390,9 +391,20 @@ Avoid adding indexes without a query or constraint that benefits from them.
 
 ## 14. Pagination
 
-R4 was not implemented. The queue loads at most 50 rows, newest first.
-That cap is not pagination. The keyset approach and its failure mode are
-in `DECISIONS.md`.
+The queue is keyset-paginated on `(createdAt DESC, id DESC)`, 50 rows per
+page. The next page is `WHERE (createdAt, id) < (cursor)` plus the same
+order, served by index `(workspaceId, createdAt DESC, id DESC)`. The cursor
+is an opaque token in `?cursor=` on `/queue`. It is not a workspace ID;
+workspace still comes from `requireCallerMembership`.
+
+Claiming or resolving a row does not change `createdAt` or `id`, so later
+pages keep the same identities. OFFSET is not used: it would skip and
+repeat as the list mutates, and deep pages would get linearly more
+expensive.
+
+Failure mode: this is not a snapshot. A new item only appears on page 1.
+A status filter is not implemented yet; EXPLAIN ANALYZE versus OFFSET is
+recorded when that lands.
 
 ## 15. Claim expiration
 

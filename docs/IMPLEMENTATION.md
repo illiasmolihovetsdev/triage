@@ -6,7 +6,8 @@ What the running system actually does today, and why it is built this way.
 is implemented and verified. Trade-offs live in `DECISIONS.md`. If those
 files disagree with the architecture notes, these two are right.
 
-Everything below reflects the state of the project through R3. Production is
+Everything below reflects the state of the project through R4 keyset
+pagination. Status filters and R5 are not in yet. Production is
 [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).
 Vercel builds generate the Prisma client and apply migrations.
 
@@ -45,9 +46,9 @@ component tree:
 - `services/auth/` makes browser-to-server calls.
 - `services/users/` queries the database and begins with `import 'server-only'`.
 - `services/items/` and `services/memberships/` load the rows authorization
-  needs. `services/items/` also loads the capped queue page and performs claim,
-  resolve, and release writes. Browser-to-server calls for those mutations live
-  in separate files so Client Components never import Prisma.
+  needs. `services/items/` also loads a keyset page of the queue and performs
+  claim, resolve, and release writes. Browser-to-server calls for those
+  mutations live in separate files so Client Components never import Prisma.
 
 That import is a guard rather than decoration. Importing a database module from
 a client component becomes a build error instead of a bundle that quietly ships
@@ -208,10 +209,27 @@ memberships from the cookie identity and accepts the request only when there is
 exactly one. Zero or more than one is **403**: guessing a workspace on the
 server is the same class of mistake as trusting one from the client.
 
-The page then loads at most 50 items, newest first (`createdAt`, then `id`).
-That cap is a guard so 10,000 rows never reach the response. It is not
-pagination: there is no next page, and the heading says how many were shown
-out of how many exist so the limit is visible.
+The page then loads 50 items, newest first (`createdAt`, then `id`). Later
+pages use a keyset cursor from the last row of the current page:
+`(createdAt, id)` encoded as `?cursor=` on `/queue`. The cursor is a
+position in that order, not a workspace ID. Workspace still comes only from
+`requireCallerMembership`. An invalid cursor is treated as page 1.
+
+The heading still says how many were shown out of how many exist. Previous,
+page numbers, and Next sit under that heading. `?page=` is the current page
+for display; the query still uses the keyset. Next is `?cursor=` (older than
+the last row). Previous after page 2 is `?before=` (the slice immediately
+newer than the first row). Page 1 is `/queue`. Page 2 previous is also
+`/queue`. The table is keyed by the cursor so client row state from the
+previous page does not stick.
+
+Numbered links only go to pages the keyset can actually reach: 1, previous,
+current, and next. They are not OFFSET jumps, so you cannot skip from page 1
+to page 40.
+
+This is pagination, not a snapshot. Claiming or resolving a row does not
+change `createdAt` or `id`, so a later page does not skip or repeat those
+identities. A newly created item only appears on page 1.
 
 Unauthenticated visits redirect to `/` from the queue layout, before
 `loading.tsx` can render. Signing in navigates to `/queue`. Signing out
