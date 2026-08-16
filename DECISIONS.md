@@ -131,12 +131,12 @@ appear on page 1 only, and a pending filter will skip a row that is
 claimed between requests. EXPLAIN ANALYZE at pending `OFFSET 5000`
 walked 5,050 index rows; the keyset at the same depth read 50.
 
-**R5 — expiring claims.** Nothing sweeps stale claims. Approach if we
-built it: no daemon. Fold expiry into the same claim `UPDATE` (`status =
-'PENDING'` OR (`status = 'CLAIMED'` AND `claimedAt` older than 30
-minutes)). A resolve that arrives after expiry uses the same idea in its
-`WHERE`; zero rows → 409, the item is claimable again. Lazy expiry means
-an abandoned claim sits until someone else claims it.
+**R5 — expiring claims.** No daemon. Expiry is in the same claim `UPDATE`
+(`PENDING` OR expired `CLAIMED`) and in the resolve `WHERE` (fresh
+`claimedAt`). Late resolve is 409. The row stays `CLAIMED` until stolen.
+TTL is 2 seconds for verification; switch `CLAIM_TTL_MS` to
+`ASSIGNMENT_CLAIM_TTL_MS` (30 minutes) after that. Queue display of
+expired rows as pending is the next step.
 
 **Retrying `FAILED` notifications.** The attempt row makes retries
 possible. We did not add them. Retrying would let the docs say

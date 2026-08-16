@@ -6,12 +6,16 @@ import { fetchQueueItemRecord } from '@/services/items/records'
 import type { ClaimItemResult } from '@/services/items/types'
 import { mapQueueItem } from '@/services/items/utils'
 import type { ClaimHolder } from '@/types/item'
+import {
+  getClaimExpiryThreshold,
+  isClaimExpired,
+} from '@/utils/claimExpiry'
 
 /*
  * The R1 guarantee lives in this UPDATE's WHERE clause, not in an application
- * if. PostgreSQL locks the row, evaluates status = PENDING, and applies at
- * most one of the concurrent updates. The loser matches zero rows and is told
- * who holds the item now.
+ * if. PostgreSQL locks the row, evaluates PENDING or an expired CLAIMED row,
+ * and applies at most one of the concurrent updates. The loser matches zero
+ * rows and is told who holds the item now.
  *
  * database is injectable so the concurrency test can use two connections.
  * Production always passes the process singleton.
@@ -26,8 +30,15 @@ export const claimItemWithClient = async (
   itemId: string,
   userId: string
 ): Promise<ClaimItemResult> => {
+  const expiryThreshold = getClaimExpiryThreshold()
   const updateResult = await database.item.updateMany({
-    where: { id: itemId, status: 'PENDING' },
+    where: {
+      id: itemId,
+      OR: [
+        { status: 'PENDING' },
+        { status: 'CLAIMED', claimedAt: { lt: expiryThreshold } },
+      ],
+    },
     data: {
       status: 'CLAIMED',
       claimedById: userId,
@@ -54,6 +65,7 @@ export const claimItemWithClient = async (
     where: { id: itemId },
     select: {
       status: true,
+      claimedAt: true,
       claimedBy: { select: { id: true, name: true } },
     },
   })
@@ -69,9 +81,15 @@ export const claimItemWithClient = async (
 
   /*
    * The winner's HTTP response can be lost. Retrying as the same user must
-   * succeed rather than 409 against yourself.
+   * succeed rather than 409 against yourself, but only while the claim is
+   * still fresh. An expired self-claim must match the UPDATE above so
+   * claimedAt is refreshed.
    */
-  if (currentItem.status === 'CLAIMED' && currentItem.claimedBy?.id === userId) {
+  if (
+    currentItem.status === 'CLAIMED' &&
+    currentItem.claimedBy?.id === userId &&
+    !isClaimExpired(currentItem.claimedAt)
+  ) {
     const claimedItemRecord = await fetchQueueItemRecord(database, itemId)
 
     if (!claimedItemRecord) {
@@ -104,3 +122,4 @@ export const claimItem = (
   itemId: string,
   userId: string
 ): Promise<ClaimItemResult> => claimItemWithClient(prisma, itemId, userId)
+

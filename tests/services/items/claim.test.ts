@@ -2,6 +2,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@/generated/prisma/client'
 import { claimItemWithClient } from '@/services/items/claim'
+import { CLAIM_TTL_MS } from '@/utils/claimExpiry'
 
 /*
  * These tests hit real PostgreSQL. The interesting case is two overlapping
@@ -46,6 +47,28 @@ const createPendingItem = async (title: string) => {
   createdItemIdList.push(itemRecord.id)
   return itemRecord.id
 }
+
+const createClaimedItem = async (
+  title: string,
+  claimedById: string,
+  claimedAt: Date
+) => {
+  const itemRecord = await setupClient.item.create({
+    data: {
+      workspaceId: SUPPORT_WORKSPACE_ID,
+      title,
+      status: 'CLAIMED',
+      claimedById,
+      claimedAt,
+    },
+    select: { id: true },
+  })
+
+  createdItemIdList.push(itemRecord.id)
+  return itemRecord.id
+}
+
+const getExpiredClaimedAt = () => new Date(Date.now() - CLAIM_TTL_MS - 1000)
 
 describe('claimItemWithClient', () => {
   beforeAll(async () => {
@@ -170,5 +193,94 @@ describe('claimItemWithClient', () => {
       code: 'CLAIM_CONFLICT',
       claimedBy: { id: BOB_USER_ID },
     })
+  })
+
+  it('lets a member steal a claim that is older than the TTL', async () => {
+    const itemId = await createClaimedItem(
+      'R5 steal expired claim',
+      BOB_USER_ID,
+      getExpiredClaimedAt()
+    )
+
+    const claimResult = await claimItemWithClient(
+      carolClient,
+      itemId,
+      CAROL_USER_ID
+    )
+
+    expect(claimResult.isSuccess).toBe(true)
+
+    if (claimResult.isSuccess) {
+      expect(claimResult.item.claimerId).toBe(CAROL_USER_ID)
+      expect(claimResult.item.status).toBe('claimed')
+    }
+
+    const storedItem = await setupClient.item.findUnique({
+      where: { id: itemId },
+      select: { status: true, claimedById: true },
+    })
+
+    expect(storedItem).toEqual({
+      status: 'CLAIMED',
+      claimedById: CAROL_USER_ID,
+    })
+  })
+
+  it('does not steal a claim that is still fresh', async () => {
+    const itemId = await createClaimedItem(
+      'R5 reject fresh steal',
+      BOB_USER_ID,
+      new Date()
+    )
+
+    const claimResult = await claimItemWithClient(
+      carolClient,
+      itemId,
+      CAROL_USER_ID
+    )
+
+    expect(claimResult).toMatchObject({
+      isSuccess: false,
+      statusCode: 409,
+      code: 'CLAIM_CONFLICT',
+      claimedBy: { id: BOB_USER_ID },
+    })
+  })
+
+  it('lets exactly one of two concurrent steals of an expired claim win', async () => {
+    const itemId = await createClaimedItem(
+      'R5 concurrent expired steal',
+      BOB_USER_ID,
+      getExpiredClaimedAt()
+    )
+
+    const [bobResult, carolResult] = await Promise.all([
+      claimItemWithClient(bobClient, itemId, BOB_USER_ID),
+      claimItemWithClient(carolClient, itemId, CAROL_USER_ID),
+    ])
+
+    const successList = [bobResult, carolResult].filter(
+      (claimResult) => claimResult.isSuccess
+    )
+    const conflictList = [bobResult, carolResult].filter(
+      (claimResult) =>
+        !claimResult.isSuccess && claimResult.code === 'CLAIM_CONFLICT'
+    )
+
+    expect(successList).toHaveLength(1)
+    expect(conflictList).toHaveLength(1)
+
+    const winnerResult = successList[0]
+
+    if (!winnerResult?.isSuccess) {
+      throw new Error('Expected one successful steal.')
+    }
+
+    const storedItem = await setupClient.item.findUnique({
+      where: { id: itemId },
+      select: { claimedById: true },
+    })
+
+    expect(storedItem?.claimedById).toBe(winnerResult.item.claimerId)
   })
 })
