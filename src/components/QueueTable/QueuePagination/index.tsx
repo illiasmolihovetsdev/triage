@@ -3,6 +3,7 @@ import type { QueuePaginationProps } from '@/components/QueueTable/QueuePaginati
 import {
   getNextPageHref,
   getPreviousPageHref,
+  getQueueListHref,
   getQueuePageNumberList,
 } from '@/components/QueueTable/QueuePagination/utils'
 
@@ -11,12 +12,19 @@ export const QueuePagination = ({
   totalPages,
   nextCursor,
   prevCursor,
+  statusFilter,
 }: QueuePaginationProps) => {
-  const nextPageHref = getNextPageHref(currentPage, nextCursor)
-  const previousPageHref = getPreviousPageHref(currentPage, prevCursor)
+  const nextPageHref = getNextPageHref(currentPage, nextCursor, statusFilter)
+  const previousPageHref = getPreviousPageHref(
+    currentPage,
+    prevCursor,
+    statusFilter
+  )
+  const firstPageHref = getQueueListHref({ statusFilter })
   const pageNumberList = getQueuePageNumberList({
     currentPage,
     totalPages,
+    firstPageHref,
     previousHref: previousPageHref,
     nextHref: nextPageHref,
   })

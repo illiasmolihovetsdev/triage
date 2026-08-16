@@ -124,11 +124,12 @@ attach it, the inline `notify()` is not.
 ## Deliberately not done
 
 **R4 — stable pagination.** The queue is keyset-paginated on
-`(createdAt DESC, id DESC)`, 50 rows per page, cursor in `?cursor=`. That
-is not OFFSET: a claim on an earlier row does not shift later pages.
-Failure mode: not a snapshot; new rows appear on page 1 only. Status
-filter and the EXPLAIN ANALYZE comparison with OFFSET are the next R4
-step.
+`(createdAt DESC, id DESC)`, 50 rows per page, with `?status=` as a
+filter. That is not OFFSET: a claim on an earlier row does not shift
+later pages of the same sort key. Failure mode: not a snapshot; new rows
+appear on page 1 only, and a pending filter will skip a row that is
+claimed between requests. EXPLAIN ANALYZE at pending `OFFSET 5000`
+walked 5,050 index rows; the keyset at the same depth read 50.
 
 **R5 — expiring claims.** Nothing sweeps stale claims. Approach if we
 built it: no daemon. Fold expiry into the same claim `UPDATE` (`status =

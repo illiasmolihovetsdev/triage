@@ -6,7 +6,11 @@ import { getTotalPageCount } from '@/components/QueueTable/QueuePagination/utils
 import { requireCallerMembership } from '@/lib/authz'
 import { fetchQueuePage } from '@/services/items'
 import { canRolePerformAction } from '@/utils/authorization'
-import { getCurrentQueuePage, getQueryStringValue } from './utils'
+import {
+  getCurrentQueuePage,
+  getQueryStringValue,
+  getQueueStatusFilter,
+} from './utils'
 
 export default async function QueuePage({
   searchParams,
@@ -38,6 +42,7 @@ export default async function QueuePage({
   const resolvedSearchParams = await searchParams
   const cursorToken = getQueryStringValue(resolvedSearchParams.cursor)
   const beforeToken = getQueryStringValue(resolvedSearchParams.before)
+  const statusFilter = getQueueStatusFilter(resolvedSearchParams.status)
   const currentPage = getCurrentQueuePage(
     cursorToken,
     beforeToken,
@@ -47,12 +52,13 @@ export default async function QueuePage({
   const queuePageResult = await fetchQueuePage(membership.workspaceId, {
     cursorToken,
     beforeToken,
+    statusFilter,
   })
   const membershipLabel = `${membership.workspaceName} · ${membership.role.toLowerCase()}`
   const canClaim = canRolePerformAction(membership.role, 'claim')
   const canResolve = canRolePerformAction(membership.role, 'resolve')
   const canRelease = canRolePerformAction(membership.role, 'release')
-  const tableKey = cursorToken ?? beforeToken ?? 'first'
+  const tableKey = `${statusFilter}:${cursorToken ?? beforeToken ?? 'first'}`
 
   return (
     <main className="mx-auto w-full max-w-5xl px-6 py-10">
@@ -86,6 +92,7 @@ export default async function QueuePage({
           canClaim={canClaim}
           canResolve={canResolve}
           canRelease={canRelease}
+          statusFilter={statusFilter}
           pagination={{
             currentPage,
             totalPages: getTotalPageCount(
@@ -94,6 +101,7 @@ export default async function QueuePage({
             ),
             nextCursor: queuePageResult.nextCursor,
             prevCursor: queuePageResult.prevCursor,
+            statusFilter,
           }}
         />
       ) : (

@@ -1,5 +1,5 @@
 import type { QueuePaginationProps } from '@/components/QueueTable/QueuePagination/types'
-import type { QueueItem } from '@/types/item'
+import type { QueueItem, QueueStatusFilter } from '@/types/item'
 
 export interface QueueTableProps {
   itemList: QueueItem[]
@@ -9,6 +9,7 @@ export interface QueueTableProps {
   canClaim: boolean
   canResolve: boolean
   canRelease: boolean
+  statusFilter: QueueStatusFilter
   pagination: QueuePaginationProps
 }
 

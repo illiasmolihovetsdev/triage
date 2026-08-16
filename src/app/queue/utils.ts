@@ -1,3 +1,5 @@
+import type { QueueStatusFilter } from '@/types/item'
+
 export const getQueryStringValue = (
   queryValue: string | string[] | undefined
 ): string | undefined =>
@@ -21,6 +23,22 @@ export const getPageNumber = (
   }
 
   return parsedPageNumber
+}
+
+export const getQueueStatusFilter = (
+  statusQueryValue: string | string[] | undefined
+): QueueStatusFilter => {
+  const statusToken = getQueryStringValue(statusQueryValue)
+
+  if (
+    statusToken === 'pending' ||
+    statusToken === 'claimed' ||
+    statusToken === 'resolved'
+  ) {
+    return statusToken
+  }
+
+  return 'all'
 }
 
 export const getCurrentQueuePage = (

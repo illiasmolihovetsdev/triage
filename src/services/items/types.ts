@@ -1,5 +1,5 @@
 import type { ItemStatus, NotificationStatus } from '@/generated/prisma/enums'
-import type { ClaimHolder, QueueItem } from '@/types/item'
+import type { ClaimHolder, QueueItem, QueueStatusFilter } from '@/types/item'
 
 export interface QueueItemRecord {
   id: string
@@ -23,6 +23,7 @@ export interface FetchQueuePageOptions {
   cursorToken?: string
   beforeToken?: string
   pageSize?: number
+  statusFilter?: QueueStatusFilter
 }
 
 export type QueuePageResult =

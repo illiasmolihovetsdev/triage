@@ -1,4 +1,4 @@
-import type { ClaimHolder, QueueItem } from '@/types/item'
+import type { ClaimHolder, QueueItem, QueueStatusFilter } from '@/types/item'
 import type { QueueRowState } from '@/components/QueueTable/types'
 
 export const getClaimerLabel = (queueItem: QueueItem): string =>
@@ -22,6 +22,11 @@ export const getQueueCountLabel = (
   shownCount === totalCount
     ? `${totalCount} items`
     : `Showing ${shownCount} of ${totalCount} items`
+
+export const getEmptyQueueMessage = (statusFilter: QueueStatusFilter): string =>
+  statusFilter === 'all'
+    ? 'No items in this workspace.'
+    : `No ${statusFilter} items in this workspace.`
 
 export const getIdleRowState = (): QueueRowState => ({ kind: 'idle' })
 

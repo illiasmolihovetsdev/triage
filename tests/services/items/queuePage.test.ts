@@ -277,4 +277,76 @@ describe('fetchQueuePageWithClient', () => {
       [thirdNewestItem.id, fourthNewestItem.id]
     )
   })
+
+  it('filters by pending and does not let a claimed row shift a later pending page', async () => {
+    const oldestPendingItem = await createQueuedItem(
+      'R4 keyset pending oldest',
+      new Date(KEYSET_CREATED_AT_BASE.getTime() + 1000)
+    )
+    const olderPendingItem = await createQueuedItem(
+      'R4 keyset pending older',
+      new Date(KEYSET_CREATED_AT_BASE.getTime() + 2000)
+    )
+    const newerPendingItem = await createQueuedItem(
+      'R4 keyset pending newer',
+      new Date(KEYSET_CREATED_AT_BASE.getTime() + 3000)
+    )
+    const newestPendingItem = await createQueuedItem(
+      'R4 keyset pending newest',
+      new Date(KEYSET_CREATED_AT_BASE.getTime() + 4000)
+    )
+
+    const firstPendingPageResult = await fetchQueuePageWithClient(
+      setupClient,
+      SUPPORT_WORKSPACE_ID,
+      { pageSize: KEYSET_PAGE_SIZE, statusFilter: 'pending' }
+    )
+
+    expect(firstPendingPageResult.isSuccess).toBe(true)
+
+    if (!firstPendingPageResult.isSuccess) {
+      throw new Error('Expected the first pending page to load.')
+    }
+
+    expect(
+      firstPendingPageResult.itemList.map((queueItem) => queueItem.id)
+    ).toEqual([newestPendingItem.id, newerPendingItem.id])
+    expect(
+      firstPendingPageResult.itemList.every(
+        (queueItem) => queueItem.status === 'pending'
+      )
+    ).toBe(true)
+
+    await setupClient.item.update({
+      where: { id: newestPendingItem.id },
+      data: {
+        status: 'CLAIMED',
+        claimedById: BOB_USER_ID,
+        claimedAt: new Date(),
+      },
+    })
+
+    const secondPendingPageResult = await fetchQueuePageWithClient(
+      setupClient,
+      SUPPORT_WORKSPACE_ID,
+      {
+        cursorToken: firstPendingPageResult.nextCursor ?? undefined,
+        pageSize: KEYSET_PAGE_SIZE,
+        statusFilter: 'pending',
+      }
+    )
+
+    expect(secondPendingPageResult.isSuccess).toBe(true)
+
+    if (!secondPendingPageResult.isSuccess) {
+      throw new Error('Expected the second pending page to load.')
+    }
+
+    expect(
+      secondPendingPageResult.itemList.map((queueItem) => queueItem.id)
+    ).toEqual([olderPendingItem.id, oldestPendingItem.id])
+    expect(
+      secondPendingPageResult.itemList.map((queueItem) => queueItem.id)
+    ).not.toContain(newestPendingItem.id)
+  })
 })

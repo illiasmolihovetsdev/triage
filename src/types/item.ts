@@ -2,6 +2,14 @@ import type { ItemStatus, NotificationStatus } from '@/generated/prisma/enums'
 
 export type QueueItemStatus = Lowercase<ItemStatus>
 export type QueueNotificationStatus = Lowercase<NotificationStatus>
+export type QueueStatusFilter = 'all' | QueueItemStatus
+
+export const QUEUE_STATUS_FILTER_LIST: readonly QueueStatusFilter[] = [
+  'all',
+  'pending',
+  'claimed',
+  'resolved',
+]
 
 export interface QueueItem {
   id: string

@@ -5,6 +5,7 @@ import {
   canShowReleaseButton,
   canShowResolveButton,
   getClaimButtonLabel,
+  getEmptyQueueMessage,
   getNotificationTextClassName,
   getReleaseButtonLabel,
   getResolveButtonLabel,
@@ -160,5 +161,14 @@ describe('notification visibility', () => {
         notificationStatus: 'pending',
       })
     ).toBe('text-zinc-700')
+  })
+})
+
+describe('getEmptyQueueMessage', () => {
+  it('names the active filter when the list is empty', () => {
+    expect(getEmptyQueueMessage('all')).toBe('No items in this workspace.')
+    expect(getEmptyQueueMessage('pending')).toBe(
+      'No pending items in this workspace.'
+    )
   })
 })

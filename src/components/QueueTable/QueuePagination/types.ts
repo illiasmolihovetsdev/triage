@@ -1,3 +1,5 @@
+import type { QueueStatusFilter } from '@/types/item'
+
 export type QueuePageNumberItem =
   | { kind: 'ellipsis' }
   | {
@@ -12,4 +14,5 @@ export interface QueuePaginationProps {
   totalPages: number
   nextCursor: string | null
   prevCursor: string | null
+  statusFilter: QueueStatusFilter
 }

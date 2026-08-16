@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getNextPageHref,
   getPreviousPageHref,
+  getQueueListHref,
   getQueuePageNumberList,
   getTotalPageCount,
 } from '@/components/QueueTable/QueuePagination/utils'
@@ -14,19 +15,34 @@ describe('getTotalPageCount', () => {
   })
 })
 
+describe('getQueueListHref', () => {
+  it('omits status for all and keeps it for a filter', () => {
+    expect(getQueueListHref({ statusFilter: 'all' })).toBe('/queue')
+    expect(getQueueListHref({ statusFilter: 'pending' })).toBe(
+      '/queue?status=pending'
+    )
+  })
+})
+
 describe('queue page hrefs', () => {
   it('builds next from the after cursor', () => {
-    expect(getNextPageHref(2, 'next-token')).toBe(
+    expect(getNextPageHref(2, 'next-token', 'all')).toBe(
       '/queue?cursor=next-token&page=3'
     )
-    expect(getNextPageHref(2, null)).toBeNull()
+    expect(getNextPageHref(2, 'next-token', 'pending')).toBe(
+      '/queue?status=pending&cursor=next-token&page=3'
+    )
+    expect(getNextPageHref(2, null, 'all')).toBeNull()
   })
 
-  it('uses /queue for page 2 previous and a before cursor after that', () => {
-    expect(getPreviousPageHref(1, 'prev-token')).toBeNull()
-    expect(getPreviousPageHref(2, 'prev-token')).toBe('/queue')
-    expect(getPreviousPageHref(3, 'prev-token')).toBe(
-      '/queue?before=prev-token&page=2'
+  it('uses the first filtered page for page 2 previous', () => {
+    expect(getPreviousPageHref(1, 'prev-token', 'all')).toBeNull()
+    expect(getPreviousPageHref(2, 'prev-token', 'all')).toBe('/queue')
+    expect(getPreviousPageHref(2, 'prev-token', 'pending')).toBe(
+      '/queue?status=pending'
+    )
+    expect(getPreviousPageHref(3, 'prev-token', 'pending')).toBe(
+      '/queue?status=pending&before=prev-token&page=2'
     )
   })
 })
@@ -37,6 +53,7 @@ describe('getQueuePageNumberList', () => {
       getQueuePageNumberList({
         currentPage: 1,
         totalPages: 172,
+        firstPageHref: '/queue',
         previousHref: null,
         nextHref: '/queue?cursor=a&page=2',
       })
@@ -56,6 +73,7 @@ describe('getQueuePageNumberList', () => {
       getQueuePageNumberList({
         currentPage: 2,
         totalPages: 172,
+        firstPageHref: '/queue',
         previousHref: '/queue',
         nextHref: '/queue?cursor=b&page=3',
       })
@@ -76,6 +94,7 @@ describe('getQueuePageNumberList', () => {
       getQueuePageNumberList({
         currentPage: 5,
         totalPages: 172,
+        firstPageHref: '/queue',
         previousHref: '/queue?before=c&page=4',
         nextHref: '/queue?cursor=d&page=6',
       })

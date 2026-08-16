@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { PrismaClient } from '@/generated/prisma/client'
+import { ItemStatus } from '@/generated/prisma/enums'
 import { prisma } from '@/lib/db'
 import {
   decodeQueueCursor,
@@ -16,27 +17,52 @@ import type {
 import { QUEUE_ITEM_SELECT } from '@/services/items/types'
 import { mapQueueItem } from '@/services/items/utils'
 import { QUEUE_PAGE_SIZE } from '@/types/item'
+import type { QueueStatusFilter } from '@/types/item'
+
+const ITEM_STATUS_BY_FILTER = {
+  pending: ItemStatus.PENDING,
+  claimed: ItemStatus.CLAIMED,
+  resolved: ItemStatus.RESOLVED,
+} as const
 
 /*
  * Keyset, not OFFSET. Later pages seek on (createdAt, id), so a claim or
  * resolve on an earlier row cannot shift them. createdAt and id do not change
  * on those writes. An invalid cursor is treated as page 1 rather than failing
- * the queue.
+ * the queue. A status filter is part of the WHERE; a row that leaves that
+ * filter (claimed while viewing pending) will not appear on a later page.
  *
  * `cursor` is "older than this row" (Next). `before` is "the page immediately
  * newer than this row" (Previous). workspaceId comes from
  * requireCallerMembership, never from the cursor.
  */
-const getQueuePageWhereAfter = (
+const getQueuePageScope = (
   workspaceId: string,
-  cursor: QueueCursor | null
+  statusFilter: QueueStatusFilter
 ) => {
-  if (!cursor) {
+  if (statusFilter === 'all') {
     return { workspaceId }
   }
 
   return {
     workspaceId,
+    status: ITEM_STATUS_BY_FILTER[statusFilter],
+  }
+}
+
+const getQueuePageWhereAfter = (
+  workspaceId: string,
+  cursor: QueueCursor | null,
+  statusFilter: QueueStatusFilter
+) => {
+  const scope = getQueuePageScope(workspaceId, statusFilter)
+
+  if (!cursor) {
+    return scope
+  }
+
+  return {
+    ...scope,
     OR: [
       { createdAt: { lt: cursor.createdAt } },
       {
@@ -47,8 +73,12 @@ const getQueuePageWhereAfter = (
   }
 }
 
-const getQueuePageWhereBefore = (workspaceId: string, cursor: QueueCursor) => ({
-  workspaceId,
+const getQueuePageWhereBefore = (
+  workspaceId: string,
+  cursor: QueueCursor,
+  statusFilter: QueueStatusFilter
+) => ({
+  ...getQueuePageScope(workspaceId, statusFilter),
   OR: [
     { createdAt: { gt: cursor.createdAt } },
     {
@@ -96,6 +126,7 @@ export const fetchQueuePageWithClient = async (
 ): Promise<QueuePageResult> => {
   try {
     const pageSize = options.pageSize ?? QUEUE_PAGE_SIZE
+    const statusFilter = options.statusFilter ?? 'all'
     const afterCursor = options.cursorToken
       ? decodeQueueCursor(options.cursorToken)
       : null
@@ -103,16 +134,21 @@ export const fetchQueuePageWithClient = async (
       afterCursor || !options.beforeToken
         ? null
         : decodeQueueCursor(options.beforeToken)
+    const countWhere = getQueuePageScope(workspaceId, statusFilter)
 
     if (beforeCursor) {
       const [oldestFirstRecordList, totalCount] = await Promise.all([
         database.item.findMany({
-          where: getQueuePageWhereBefore(workspaceId, beforeCursor),
+          where: getQueuePageWhereBefore(
+            workspaceId,
+            beforeCursor,
+            statusFilter
+          ),
           orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
           take: pageSize + 1,
           select: QUEUE_ITEM_SELECT,
         }),
-        database.item.count({ where: { workspaceId } }),
+        database.item.count({ where: countWhere }),
       ])
 
       const { pageRecordList: oldestFirstPage, hasNextPage: hasPreviousPage } =
@@ -129,12 +165,12 @@ export const fetchQueuePageWithClient = async (
 
     const [itemRecordList, totalCount] = await Promise.all([
       database.item.findMany({
-        where: getQueuePageWhereAfter(workspaceId, afterCursor),
+        where: getQueuePageWhereAfter(workspaceId, afterCursor, statusFilter),
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: pageSize + 1,
         select: QUEUE_ITEM_SELECT,
       }),
-      database.item.count({ where: { workspaceId } }),
+      database.item.count({ where: countWhere }),
     ])
 
     const { pageRecordList, hasNextPage } = getQueuePageWindow(

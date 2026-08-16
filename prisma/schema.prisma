@@ -90,8 +90,8 @@ model Item {
 
   // Unfiltered queue keyset: workspace, then recency, id as the tiebreaker.
   @@index([workspaceId, createdAt(sort: Desc), id(sort: Desc)])
-  // Filtered queue listing: workspace, status, then recency.
-  @@index([workspaceId, status, createdAt])
+  // Filtered queue keyset: workspace, status, recency, id as the tiebreaker.
+  @@index([workspaceId, status, createdAt(sort: Desc), id(sort: Desc)])
   // "What am I currently holding?"
   @@index([claimedById])
 }

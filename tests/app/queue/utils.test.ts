@@ -3,6 +3,7 @@ import {
   getCurrentQueuePage,
   getPageNumber,
   getQueryStringValue,
+  getQueueStatusFilter,
 } from '@/app/queue/utils'
 
 describe('getQueryStringValue', () => {
@@ -36,5 +37,16 @@ describe('getCurrentQueuePage', () => {
   it('does not treat a cursor as page 1', () => {
     expect(getCurrentQueuePage('cursor-token', undefined, '1')).toBe(2)
     expect(getCurrentQueuePage('cursor-token', undefined, undefined)).toBe(2)
+  })
+})
+
+describe('getQueueStatusFilter', () => {
+  it('keeps a known status and treats anything else as all', () => {
+    expect(getQueueStatusFilter('pending')).toBe('pending')
+    expect(getQueueStatusFilter('claimed')).toBe('claimed')
+    expect(getQueueStatusFilter('resolved')).toBe('resolved')
+    expect(getQueueStatusFilter('all')).toBe('all')
+    expect(getQueueStatusFilter('nope')).toBe('all')
+    expect(getQueueStatusFilter(undefined)).toBe('all')
   })
 })

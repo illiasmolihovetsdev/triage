@@ -2,9 +2,13 @@
 
 import { QueuePagination } from '@/components/QueueTable/QueuePagination'
 import { QueueRow } from '@/components/QueueTable/QueueRow'
+import { QueueStatusFilter } from '@/components/QueueTable/QueueStatusFilter'
 import { useQueueActions } from '@/components/QueueTable/hooks'
 import type { QueueTableProps } from '@/components/QueueTable/types'
-import { getQueueCountLabel } from '@/components/QueueTable/utils'
+import {
+  getEmptyQueueMessage,
+  getQueueCountLabel,
+} from '@/components/QueueTable/utils'
 
 export const QueueTable = ({
   itemList: initialItemList,
@@ -14,6 +18,7 @@ export const QueueTable = ({
   canClaim,
   canResolve,
   canRelease,
+  statusFilter,
   pagination,
 }: QueueTableProps) => {
   const {
@@ -24,48 +29,50 @@ export const QueueTable = ({
     handleRelease,
   } = useQueueActions(initialItemList)
   const countLabel = getQueueCountLabel(shownCount, totalCount)
-
-  if (itemList.length === 0) {
-    return (
-      <p className="border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-600">
-        No items in this workspace.
-      </p>
-    )
-  }
+  const emptyQueueMessage = getEmptyQueueMessage(statusFilter)
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
-        {countLabel}
-      </h2>
-      <QueuePagination {...pagination} />
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-zinc-300 text-left text-xs uppercase tracking-wide text-zinc-500">
-            <th className="py-2 pr-4 font-medium">Title</th>
-            <th className="py-2 pr-4 font-medium">Status</th>
-            <th className="py-2 pr-4 font-medium">Claimer</th>
-            <th className="py-2 pr-4 font-medium">Notification</th>
-            <th className="py-2 font-medium" />
-          </tr>
-        </thead>
-        <tbody>
-          {itemList.map((queueItem) => (
-            <QueueRow
-              key={queueItem.id}
-              queueItem={queueItem}
-              rowState={getRowState(queueItem.id)}
-              currentUserId={currentUserId}
-              canClaim={canClaim}
-              canResolve={canResolve}
-              canRelease={canRelease}
-              onClaim={handleClaim}
-              onResolve={handleResolve}
-              onRelease={handleRelease}
-            />
-          ))}
-        </tbody>
-      </table>
+      <QueueStatusFilter currentFilter={statusFilter} />
+      {itemList.length === 0 ? (
+        <p className="border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-600">
+          {emptyQueueMessage}
+        </p>
+      ) : (
+        <>
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-zinc-500">
+            {countLabel}
+          </h2>
+          <QueuePagination {...pagination} />
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-zinc-300 text-left text-xs uppercase tracking-wide text-zinc-500">
+                <th className="py-2 pr-4 font-medium">Title</th>
+                <th className="py-2 pr-4 font-medium">Status</th>
+                <th className="py-2 pr-4 font-medium">Claimer</th>
+                <th className="py-2 pr-4 font-medium">Notification</th>
+                <th className="py-2 font-medium" />
+              </tr>
+            </thead>
+            <tbody>
+              {itemList.map((queueItem) => (
+                <QueueRow
+                  key={queueItem.id}
+                  queueItem={queueItem}
+                  rowState={getRowState(queueItem.id)}
+                  currentUserId={currentUserId}
+                  canClaim={canClaim}
+                  canResolve={canResolve}
+                  canRelease={canRelease}
+                  onClaim={handleClaim}
+                  onResolve={handleResolve}
+                  onRelease={handleRelease}
+                />
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
     </section>
   )
 }

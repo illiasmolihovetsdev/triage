@@ -6,8 +6,8 @@ What the running system actually does today, and why it is built this way.
 is implemented and verified. Trade-offs live in `DECISIONS.md`. If those
 files disagree with the architecture notes, these two are right.
 
-Everything below reflects the state of the project through R4 keyset
-pagination. Status filters and R5 are not in yet. Production is
+Everything below reflects the state of the project through R4 (keyset
+pagination and status filter). R5 is not in yet. Production is
 [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).
 Vercel builds generate the Prisma client and apply migrations.
 
@@ -209,27 +209,73 @@ memberships from the cookie identity and accepts the request only when there is
 exactly one. Zero or more than one is **403**: guessing a workspace on the
 server is the same class of mistake as trusting one from the client.
 
-The page then loads 50 items, newest first (`createdAt`, then `id`). Later
-pages use a keyset cursor from the last row of the current page:
+The page then loads 50 items, newest first (`createdAt`, then `id`). `?status=`
+filters to pending, claimed, or resolved. Invalid or missing status is all
+items, which is what the queue showed before this filter existed. Changing
+status returns to page 1 of that filter; it does not keep a cursor from a
+different list.
+
+Later pages use a keyset cursor from the last row of the current page:
 `(createdAt, id)` encoded as `?cursor=` on `/queue`. The cursor is a
 position in that order, not a workspace ID. Workspace still comes only from
 `requireCallerMembership`. An invalid cursor is treated as page 1.
 
-The heading still says how many were shown out of how many exist. Previous,
-page numbers, and Next sit under that heading. `?page=` is the current page
-for display; the query still uses the keyset. Next is `?cursor=` (older than
-the last row). Previous after page 2 is `?before=` (the slice immediately
-newer than the first row). Page 1 is `/queue`. Page 2 previous is also
-`/queue`. The table is keyed by the cursor so client row state from the
-previous page does not stick.
-
+The heading still says how many were shown out of how many exist, counted
+inside the active filter. Previous, page numbers, and Next sit under that
+heading. `?page=` is the current page for display; the query still uses the
+keyset. Next is `?cursor=` (older than the last row). Previous after page 2
+is `?before=` (the slice immediately newer than the first row). Page 1 of
+all statuses is `/queue`; page 1 of pending is `/queue?status=pending`.
 Numbered links only go to pages the keyset can actually reach: 1, previous,
-current, and next. They are not OFFSET jumps, so you cannot skip from page 1
-to page 40.
+current, and next. They are not OFFSET jumps.
 
 This is pagination, not a snapshot. Claiming or resolving a row does not
-change `createdAt` or `id`, so a later page does not skip or repeat those
-identities. A newly created item only appears on page 1.
+change `createdAt` or `id`, so an unfiltered later page does not skip or
+repeat those identities. On a pending filter, a row claimed between page
+requests leaves the list and will not appear on a later pending page. A
+newly created item only appears on page 1.
+
+Unfiltered listing uses index `(workspaceId, createdAt DESC, id DESC)`.
+Filtered listing uses `(workspaceId, status, createdAt DESC, id DESC)`.
+
+### EXPLAIN ANALYZE: OFFSET vs keyset
+
+Run on 16 August 2026 against the seeded Support workspace, pending rows,
+page depth 100 (`OFFSET 5000` / the 5000th pending row as the keyset
+cursor). Both plans use `Item_workspaceId_status_createdAt_id_idx`.
+
+Naive OFFSET walks 5,050 index rows to return 50:
+
+```
+Limit  (cost=512.32..517.44 rows=50 width=88) (actual time=2.972..3.036 rows=50 loops=1)
+  Buffers: shared hit=5079 read=1
+  ->  Index Scan using "Item_workspaceId_status_createdAt_id_idx" on "Item"
+        (cost=0.29..592.51 rows=5783 width=88)
+        (actual time=0.018..2.812 rows=5050 loops=1)
+        Index Cond: (("workspaceId" = 'ws_support'::text) AND (status = 'PENDING'::"ItemStatus"))
+        Buffers: shared hit=5079 read=1
+Planning Time: 0.113 ms
+Execution Time: 3.063 ms
+```
+
+Keyset starts at the cursor and reads 50 rows:
+
+```
+Limit  (cost=0.29..28.21 rows=50 width=88) (actual time=0.019..0.079 rows=50 loops=1)
+  Buffers: shared hit=50
+  ->  Index Scan using "Item_workspaceId_status_createdAt_id_idx" on "Item"
+        (cost=0.29..427.52 rows=765 width=88)
+        (actual time=0.018..0.073 rows=50 loops=1)
+        Index Cond: (("workspaceId" = 'ws_support'::text) AND (status = 'PENDING'::"ItemStatus")
+          AND (ROW("createdAt", id) < ROW('2026-05-27 17:30:11.855+00', '4025c6c6-1473-4874-ab27-6e851b5c85c6')))
+        Buffers: shared hit=50
+Planning Time: 0.143 ms
+Execution Time: 0.118 ms
+```
+
+At ~10k rows OFFSET is still a few milliseconds. The difference that
+matters is `rows=5050` and 5,079 buffers versus `rows=50` and 50 buffers.
+That OFFSET walk grows linearly with page depth; the keyset plan does not.
 
 Unauthenticated visits redirect to `/` from the queue layout, before
 `loading.tsx` can render. Signing in navigates to `/queue`. Signing out
