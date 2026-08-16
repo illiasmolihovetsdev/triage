@@ -10,8 +10,8 @@ Supabase Postgres, and Vercel.
 is the trade-off record. Where those two disagree with this file, they are
 right.
 
-R5 (expiring claims) is implemented on the claim and resolve writes. The
-queue does not yet display expired claims as pending.
+R5 (expiring claims) is not implemented. The intended approach is in
+`DECISIONS.md`.
 
 ## 1. System overview
 
@@ -413,15 +413,8 @@ later pending pages.
 
 ## 15. Claim expiration
 
-There is no daemon and no sweep-on-read. Expiry is a predicate in the same
-claim and resolve `UPDATE`s that already serialize R1. A claim older than
-`CLAIM_TTL_MS` can be stolen (`PENDING` OR expired `CLAIMED`). A resolve
-requires a fresh `claimedAt`; after expiry it is 409. An abandoned claim
-stays `CLAIMED` in the database until stolen. The queue UI does not yet
-map those rows to pending.
-
-The TTL is 2 seconds while this is verified; the assignment value is 30
-minutes.
+R5 was not implemented. Nothing sweeps stale claims. The lazy-`UPDATE`
+approach and the late-resolve race are in `DECISIONS.md`.
 
 ## 16. Server/API boundary
 

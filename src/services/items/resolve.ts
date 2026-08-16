@@ -7,16 +7,11 @@ import { fetchQueueItemRecord } from '@/services/items/records'
 import type { ResolveItemResult } from '@/services/items/types'
 import { mapQueueItem } from '@/services/items/utils'
 import type { ClaimHolder } from '@/types/item'
-import {
-  getClaimExpiryThreshold,
-  isClaimExpired,
-} from '@/utils/claimExpiry'
 
 /*
  * Authorization already requires the caller to be the claimer. The UPDATE
  * repeats that in WHERE so a missed check still cannot resolve someone else's
- * row, or a row that is no longer CLAIMED. claimedAt must still be fresh:
- * an expired claim is 409, not a successful resolve.
+ * row, or a row that is no longer CLAIMED.
  *
  * The NotificationAttempt insert is in the same transaction as the UPDATE.
  * Either the item is RESOLVED and has exactly one PENDING attempt, or neither
@@ -25,9 +20,7 @@ import {
  */
 const getResolveConflictMessage = (
   status: ItemStatus,
-  claimedBy: ClaimHolder | null,
-  claimedAt: Date | null,
-  userId: string
+  claimedBy: ClaimHolder | null
 ): string => {
   if (status === 'RESOLVED') {
     return 'This item is already resolved.'
@@ -35,14 +28,6 @@ const getResolveConflictMessage = (
 
   if (status === 'PENDING') {
     return 'This item is no longer claimed.'
-  }
-
-  if (
-    status === 'CLAIMED' &&
-    claimedBy?.id === userId &&
-    isClaimExpired(claimedAt)
-  ) {
-    return 'This claim has expired.'
   }
 
   return claimedBy
@@ -64,12 +49,7 @@ export const resolveItemWithClient = async (
 ): Promise<ResolveItemResult> => {
   const didResolve = await database.$transaction(async (transaction) => {
     const updateResult = await transaction.item.updateMany({
-      where: {
-        id: itemId,
-        status: 'CLAIMED',
-        claimedById: userId,
-        claimedAt: { gte: getClaimExpiryThreshold() },
-      },
+      where: { id: itemId, status: 'CLAIMED', claimedById: userId },
       data: {
         status: 'RESOLVED',
         resolvedAt: new Date(),
@@ -105,7 +85,6 @@ export const resolveItemWithClient = async (
     select: {
       status: true,
       claimedById: true,
-      claimedAt: true,
       claimedBy: { select: { id: true, name: true } },
     },
   })
@@ -139,9 +118,7 @@ export const resolveItemWithClient = async (
     code: 'RESOLVE_CONFLICT',
     message: getResolveConflictMessage(
       currentItem.status,
-      currentItem.claimedBy,
-      currentItem.claimedAt,
-      userId
+      currentItem.claimedBy
     ),
     item: currentItemRecord ? mapQueueItem(currentItemRecord) : null,
   }

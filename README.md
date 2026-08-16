@@ -27,7 +27,7 @@ today, not what is planned.
 | R2 — workspace isolation and roles | Done (`npm run verify:r2`) |
 | R3 — resolve and notify | Done (sent/failed appear on the open row) |
 | R4 — stable pagination | Done (keyset + status filter; EXPLAIN ANALYZE in `docs/IMPLEMENTATION.md`) |
-| R5 — expiring claims | In progress: server predicate (2s TTL for verification). Queue display next. |
+| R5 (optional) | Not started; approach in `DECISIONS.md` |
 
 ## Setup
 

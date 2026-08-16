@@ -6,9 +6,8 @@ What the running system actually does today, and why it is built this way.
 is implemented and verified. Trade-offs live in `DECISIONS.md`. If those
 files disagree with the architecture notes, these two are right.
 
-Everything below reflects the state of the project through R4 and R5
-server-side claim expiry. Queue display of expired claims is not in yet.
-Production is
+Everything below reflects the state of the project through R4 (keyset
+pagination and status filter). R5 is not in yet. Production is
 [https://triage-seven-eta.vercel.app](https://triage-seven-eta.vercel.app).
 Vercel builds generate the Prisma client and apply migrations.
 
@@ -295,31 +294,21 @@ neither Resolve nor Release on it. That hiding is display only; the matching
 ```sql
 UPDATE "Item"
 SET status = 'CLAIMED', "claimedById" = $userId, "claimedAt" = now()
-WHERE id = $itemId
-  AND (
-    status = 'PENDING'
-    OR (status = 'CLAIMED' AND "claimedAt" < $expiryThreshold)
-  )
+WHERE id = $itemId AND status = 'PENDING'
 ```
 
-Prisma `updateMany` with that `OR` compiles to that statement. PostgreSQL
-locks the row, evaluates `WHERE`, and applies at most one of the concurrent
-updates. That is the R1 guarantee — not an application-level `if` after a
-read. An expired claim is claimable again through the same lock.
-
-The TTL is `CLAIM_TTL_MS` in `src/utils/claimExpiry.ts`. It is **2 seconds**
-while we verify the predicate; the assignment value is 30 minutes
-(`ASSIGNMENT_CLAIM_TTL_MS`). The threshold uses the application clock.
+Prisma `updateMany` with `where: { id, status: 'PENDING' }` compiles to that
+statement. PostgreSQL locks the row, evaluates `WHERE`, and applies at most one
+of the concurrent updates. That is the R1 guarantee — not an application-level
+`if` after a read.
 
 The loser matches zero rows, reads who holds the item now, and receives **409**
 `CLAIM_CONFLICT` with `{ claimedBy: { id, name } }`. The follow-up read is not
 the winning snapshot: if the winner has already released and someone else
 claimed, the 409 names the current holder, which is what the UI needs.
 
-If the caller already holds a **fresh** claim, the response is **200**. A lost
-winner response can be retried without turning into a conflict against
-yourself. An expired self-claim matches the UPDATE so `claimedAt` is
-refreshed rather than returning 200 against the stale timestamp.
+If the caller already holds the claim, the response is **200**. A lost winner
+response can be retried without turning into a conflict against yourself.
 
 Viewers never reach the `UPDATE` (**403**). A user from another workspace gets
 the same **404** as an unknown item. Unauthenticated requests get **401**.
@@ -352,10 +341,7 @@ Resolve:
 ```sql
 UPDATE "Item"
 SET status = 'RESOLVED', "resolvedAt" = now()
-WHERE id = $itemId
-  AND status = 'CLAIMED'
-  AND "claimedById" = $userId
-  AND "claimedAt" >= $expiryThreshold
+WHERE id = $itemId AND status = 'CLAIMED' AND "claimedById" = $userId
 ```
 
 Release:
@@ -369,13 +355,7 @@ WHERE id = $itemId AND status = 'CLAIMED' AND "claimedById" = $userId
 The claimer check is therefore enforced twice. `requireItemAction` returns 403
 `NOT_CLAIMER` before the write. The `WHERE` clause is the backstop: a caller
 who is not the current claimer, or an item that is no longer `CLAIMED`, matches
-zero rows. A resolve after expiry also matches zero rows: that is **409**
-`RESOLVE_CONFLICT` with `This claim has expired.`, not 403. The caller still
-is `claimedById`; the claim is stale. The item stays `CLAIMED` in the database
-until someone claims it (or the original claimer releases). The queue UI does
-not yet display expired rows as pending.
-
-The loser of that write receives **409** with the current item so
+zero rows. The loser of that write receives **409** with the current item so
 the row can update without a refresh.
 
 RESOLVED is terminal. Release does not clear `resolvedAt` because a `CLAIMED`
