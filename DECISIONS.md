@@ -131,12 +131,42 @@ appear on page 1 only, and a pending filter will skip a row that is
 claimed between requests. EXPLAIN ANALYZE at pending `OFFSET 5000`
 walked 5,050 index rows; the keyset at the same depth read 50.
 
-**R5 — expiring claims.** Nothing sweeps stale claims. Approach if we
-built it: no daemon. Fold expiry into the same claim `UPDATE` (`status =
-'PENDING'` OR (`status = 'CLAIMED'` AND `claimedAt` older than 30
-minutes)). A resolve that arrives after expiry uses the same idea in its
-`WHERE`; zero rows → 409, the item is claimable again. Lazy expiry means
-an abandoned claim sits until someone else claims it.
+**R5 — expiring claims.** Declined, then reverted. A lazy-expiry
+prototype treated `claimedAt` older than a TTL as stealable in the claim
+`UPDATE` and as pending in the queue, while Postgres still stored
+`CLAIMED`. That is two representations of one item. The database is the
+source of truth here: the UI must not display a status the row does not
+have.
+
+Existing `CLAIMED` rows were created before expiration existed.
+`claimedAt` means when the claim was taken, not when it should die.
+Silently reinterpreting those timestamps, or rewriting thousands of live
+claims to `PENDING` as part of shipping the feature, is an unplanned
+migration. I will not do that.
+
+What I would do if expiration were a product requirement:
+
+1. Model it from the start of a claim, not as a derived UI rule.
+2. Persist an explicit expiry timestamp (or equivalent lifecycle) on
+   every new claim.
+3. Run a background scheduler — Vercel Cron or `pg_cron` — that
+   periodically `UPDATE`s expired rows from `CLAIMED` to `PENDING` and
+   clears the claimer.
+4. After that write, Postgres and the queue agree.
+5. If adding this to an existing production system: inventory current
+   `CLAIMED` rows, agree with the business/support team how active claims
+   are handled, backfill in a controlled migration, then enable the
+   scheduler.
+6. Resolve must atomically require a still-valid claim in the same
+   `UPDATE` that sets `RESOLVED`. Once the scheduler has expired the row,
+   the previous claimer cannot resolve it.
+
+I would not map an expired `CLAIMED` row to pending only in the UI, write
+from a GET, treat client polling as source of truth, or run an in-memory
+loop on a serverless instance that stops when the response is sent. Lazy
+expiry violates the source-of-truth rule. A correct implementation needs
+a persisted expiry lifecycle and a process that actually changes the
+row.
 
 **Retrying `FAILED` notifications.** The attempt row makes retries
 possible. We did not add them. Retrying would let the docs say
